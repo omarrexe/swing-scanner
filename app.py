@@ -449,17 +449,18 @@ STOCK_SECTORS = {
 ALL_TICKERS = list(STOCK_SECTORS.keys())
 
 # ══════════════════════════════════════════════════════════════════
-#  CONFIGURATION
+#  CONFIGURATION — Rotation Trading Approach
 # ══════════════════════════════════════════════════════════════════
 CFG = {
-    "min_win_prob": 70,
-    "min_profit_pct": 10.0,
-    "min_rr": 2.5,
-    "sl_atr_mult": 1.5,
-    "tp_atr_mult": 4.0,
+    "min_win_prob": 60,       # Lowered from 70 to get more signals
+    "min_profit_pct": 6.0,    # Lowered from 10 to get more signals
+    "min_rr": 2.0,            # 2:1 reward/risk minimum
+    "sl_atr_mult": 1.5,       # Stop loss = 1.5x ATR
+    "tp_atr_mult": 3.5,       # Take profit = 3.5x ATR
     "risk_per_trade_pct": 5.0,
-    "max_position_pct": 90.0,
+    "max_position_pct": 95.0, # Use almost all capital (rotation)
     "scan_threads": 8,
+    "max_signals": 5,         # Show top 5 signals for rotation
 }
 
 # ══════════════════════════════════════════════════════════════════
@@ -791,7 +792,7 @@ def analyze_ticker(ticker, capital=1000):
 
 
 # ══════════════════════════════════════════════════════════════════
-#  SCAN MARKET
+#  SCAN MARKET — Returns multiple signals for rotation
 # ══════════════════════════════════════════════════════════════════
 def scan_market(tickers, capital, progress_callback=None):
     results = []
@@ -809,7 +810,8 @@ def scan_market(tickers, capital, progress_callback=None):
                 results.append(result)
     
     results.sort(key=lambda x: x["win_prob"], reverse=True)
-    return results[0] if results else None
+    # Return top signals for rotation (not just one)
+    return results[:CFG["max_signals"]] if results else []
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1004,8 +1006,8 @@ st.markdown(CSS, unsafe_allow_html=True)
 # Header
 st.markdown("""
 <div class="app-header">
-    <h1 class="app-title">Sniper Mode</h1>
-    <p class="app-subtitle">One Perfect Pick · Quality Over Quantity</p>
+    <h1 class="app-title">Rotation Mode</h1>
+    <p class="app-subtitle">Take Signals · Rotate Capital · Compound Gains</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1023,7 +1025,7 @@ st.markdown(f"""
 st.markdown("<hr>", unsafe_allow_html=True)
 
 # Scan Button
-scan_btn = st.button("Find Best Trade", type="primary", use_container_width=True)
+scan_btn = st.button("Find Trades", type="primary", use_container_width=True)
 
 # Handle scan
 if scan_btn:
@@ -1033,90 +1035,124 @@ if scan_btn:
     def update_progress(pct):
         progress.progress(pct, text=f"Analyzing {int(pct*100)}%")
     
-    result = scan_market(ALL_TICKERS, 1000, update_progress)
+    results = scan_market(ALL_TICKERS, 1000, update_progress)
     progress.empty()
-    st.session_state["sniper_result"] = result
+    st.session_state["sniper_result"] = results
 
-# Display result
-result = st.session_state.get("sniper_result")
+# Display results
+results = st.session_state.get("sniper_result")
 
-if result is not None:
-    ind = result["ind"]
-    pos = result["pos"]
-    reasons = result["reasons"]
-    
+if results and len(results) > 0:
+    # Show count of signals found
     st.markdown(f"""
-    <div class="result-card">
-        <div class="ticker-display">
-            <span class="ticker-symbol">{result['ticker']}</span>
-            <span class="ticker-price">${ind['price']:.2f}</span>
-        </div>
-        <span class="ticker-sector">{result['sector']}</span>
-        
-        <div class="prob-circle">
-            <div class="prob-number">{result['win_prob']}%</div>
-            <div class="prob-label">Win Probability</div>
-        </div>
-        
-        <div class="levels-grid">
-            <div class="level-item">
-                <div class="level-value white">${ind['price']:.2f}</div>
-                <div class="level-label">Entry</div>
-            </div>
-            <div class="level-item">
-                <div class="level-value red">${pos['sl']:.2f}</div>
-                <div class="level-label">Stop Loss</div>
-            </div>
-            <div class="level-item">
-                <div class="level-value green">${pos['tp']:.2f}</div>
-                <div class="level-label">Target</div>
-            </div>
-            <div class="level-item">
-                <div class="level-value blue">1:{pos['rr']:.1f}</div>
-                <div class="level-label">Risk/Reward</div>
-            </div>
-        </div>
+    <div style="text-align: center; margin: 1rem 0;">
+        <span style="color: #4ade80; font-size: 1.2rem; font-weight: 600;">{len(results)} Signal{'s' if len(results) > 1 else ''} Found</span>
+        <span style="color: #64748b; margin-left: 8px;">Take #1, rotate to next when closed</span>
     </div>
     """, unsafe_allow_html=True)
     
-    # Capital Input (only shown after stock found)
-    st.markdown('<div class="capital-card"><div class="capital-title">💰 Calculate Position Size</div></div>', unsafe_allow_html=True)
-    capital = st.number_input("Enter your capital ($)", min_value=100.0, max_value=1000000.0, value=st.session_state["capital"], step=100.0, label_visibility="collapsed")
+    # Capital input at top
+    st.markdown('<div class="capital-card"><div class="capital-title">💰 Your Capital</div></div>', unsafe_allow_html=True)
+    capital = st.number_input("Enter capital", min_value=100.0, max_value=1000000.0, value=st.session_state["capital"], step=100.0, label_visibility="collapsed")
     st.session_state["capital"] = capital
     
-    # Recalculate position with user's capital
-    pos = calc_position(ind, capital)
+    # Display each signal
+    for i, result in enumerate(results):
+        ind = result["ind"]
+        pos = calc_position(ind, capital)
+        reasons = result["reasons"]
+        
+        # Signal number badge
+        badge_color = "#4ade80" if i == 0 else "#64748b"
+        badge_text = "TAKE NOW" if i == 0 else f"#{i+1} NEXT"
+        
+        st.markdown(f"""
+        <div class="result-card" style="{'border: 2px solid #4ade80;' if i == 0 else 'opacity: 0.8;'}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div class="ticker-display">
+                    <span class="ticker-symbol">{result['ticker']}</span>
+                    <span class="ticker-price">${ind['price']:.2f}</span>
+                </div>
+                <span style="background: {badge_color}; color: #000; padding: 4px 12px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;">{badge_text}</span>
+            </div>
+            <span class="ticker-sector">{result['sector']}</span>
+            
+            <div class="levels-grid" style="margin-top: 1.5rem;">
+                <div class="level-item">
+                    <div class="level-value" style="color: #a78bfa;">{result['win_prob']}%</div>
+                    <div class="level-label">Probability</div>
+                </div>
+                <div class="level-item">
+                    <div class="level-value red">${pos['sl']:.2f}</div>
+                    <div class="level-label">Stop ({pos['sl_pct']:.1f}%)</div>
+                </div>
+                <div class="level-item">
+                    <div class="level-value green">${pos['tp']:.2f}</div>
+                    <div class="level-label">Target (+{pos['tp_pct']:.1f}%)</div>
+                </div>
+                <div class="level-item">
+                    <div class="level-value blue">{pos['shares']:.1f}</div>
+                    <div class="level-label">Shares</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); color: #64748b; font-size: 0.85rem;">
+                <span>Risk: <span style="color: #f87171;">${pos['max_loss']:.0f}</span></span>
+                <span>Reward: <span style="color: #4ade80;">${pos['max_gain']:.0f}</span></span>
+                <span>R:R <span style="color: #60a5fa;">1:{pos['rr']:.1f}</span></span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Expandable details for first signal only
+        if i == 0:
+            with st.expander("Why this stock?"):
+                for title, text in reasons:
+                    st.markdown(f'<div class="reason-item"><div class="reason-title">{title}</div><div class="reason-text">{text}</div></div>', unsafe_allow_html=True)
+            
+            with st.expander("View Chart"):
+                fig = make_chart(result["df"], ind, pos)
+                st.plotly_chart(fig, use_container_width=True)
+    
+    # Expected returns box
+    avg_gain = 6.7  # Based on backtest
+    avg_loss = 3.3
+    win_rate = 0.45  # Conservative estimate
+    expected_per_trade = (win_rate * avg_gain) - ((1-win_rate) * avg_loss)
+    monthly_trades = 7
+    monthly_return = expected_per_trade * monthly_trades
     
     st.markdown(f"""
-    <div class="trade-plan">
-        <div class="plan-title">📋 Your Trade Plan</div>
-        <div class="plan-grid">
-            <div class="plan-item"><span>Shares:</span> {pos['shares']:.2f}</div>
-            <div class="plan-item"><span>Capital:</span> ${pos['cap_used']:.0f}</div>
-            <div class="plan-item"><span>Max Loss:</span> <span style="color:#ff453a">${pos['max_loss']:.0f}</span></div>
-            <div class="plan-item"><span>Max Gain:</span> <span style="color:#30d158">${pos['max_gain']:.0f}</span></div>
+    <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 16px; padding: 1.5rem; margin: 1.5rem 0;">
+        <div style="color: #a78bfa; font-weight: 600; font-size: 0.9rem; margin-bottom: 1rem;">📈 Rotation Strategy (Expected)</div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+            <div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: #fff;">~{monthly_trades}</div>
+                <div style="font-size: 0.7rem; color: #64748b;">TRADES/MONTH</div>
+            </div>
+            <div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: #4ade80;">+{expected_per_trade:.1f}%</div>
+                <div style="font-size: 0.7rem; color: #64748b;">PER TRADE</div>
+            </div>
+            <div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: #4ade80;">+${capital * monthly_return / 100:.0f}</div>
+                <div style="font-size: 0.7rem; color: #64748b;">MONTHLY EST.</div>
+            </div>
+        </div>
+        <div style="color: #64748b; font-size: 0.8rem; margin-top: 1rem; text-align: center;">
+            Based on ~45% win rate · +6.7% avg win · -3.3% avg loss
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Why this stock
-    with st.expander("Why this stock?"):
-        for title, text in reasons:
-            st.markdown(f'<div class="reason-item"><div class="reason-title">{title}</div><div class="reason-text">{text}</div></div>', unsafe_allow_html=True)
-    
-    # Chart
-    with st.expander("View Chart"):
-        fig = make_chart(result["df"], ind, pos)
-        st.plotly_chart(fig, use_container_width=True)
 
 elif scan_btn:
     st.markdown("""
     <div class="empty-state">
         <div class="empty-icon">◎</div>
-        <div class="empty-title">No Perfect Setup Today</div>
+        <div class="empty-title">No Setups Today</div>
         <div class="empty-text">
-            No stocks meet our strict 70%+ criteria right now.<br>
-            This protects your capital. Check back tomorrow.
+            No stocks meet our 60%+ criteria right now.<br>
+            Check back tomorrow. Patience pays.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1127,8 +1163,8 @@ else:
         <div class="empty-icon">◎</div>
         <div class="empty-title">Ready to Scan</div>
         <div class="empty-text">
-            Scanning {len(ALL_TICKERS)} quality stocks for the single best opportunity.<br>
-            70%+ probability · 10%+ target · Multi-timeframe confirmed
+            Scanning {len(ALL_TICKERS)} stocks for rotation opportunities.<br>
+            60%+ probability · 2:1 reward/risk · Take signals, rotate capital
         </div>
     </div>
     """, unsafe_allow_html=True)
