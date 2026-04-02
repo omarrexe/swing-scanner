@@ -1044,12 +1044,8 @@ results = st.session_state.get("sniper_result")
 
 if results and len(results) > 0:
     # Show count of signals found
-    st.markdown(f"""
-    <div style="text-align: center; margin: 1rem 0;">
-        <span style="color: #4ade80; font-size: 1.2rem; font-weight: 600;">{len(results)} Signal{'s' if len(results) > 1 else ''} Found</span>
-        <span style="color: #64748b; margin-left: 8px;">Take #1, rotate to next when closed</span>
-    </div>
-    """, unsafe_allow_html=True)
+    count_text = f"{len(results)} Signal{'s' if len(results) > 1 else ''} Found"
+    st.markdown(f'<div style="text-align: center; margin: 1rem 0;"><span style="color: #4ade80; font-size: 1.2rem; font-weight: 600;">{count_text}</span><span style="color: #64748b; margin-left: 8px;">Take #1, rotate to next when closed</span></div>', unsafe_allow_html=True)
     
     # Capital input at top
     st.markdown('<div class="capital-card"><div class="capital-title">💰 Your Capital</div></div>', unsafe_allow_html=True)
@@ -1065,44 +1061,28 @@ if results and len(results) > 0:
         # Signal number badge
         badge_color = "#4ade80" if i == 0 else "#64748b"
         badge_text = "TAKE NOW" if i == 0 else f"#{i+1} NEXT"
+        card_style = "border: 2px solid #4ade80;" if i == 0 else "opacity: 0.8;"
         
-        st.markdown(f"""
-        <div class="result-card" style="{'border: 2px solid #4ade80;' if i == 0 else 'opacity: 0.8;'}">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <div class="ticker-display">
-                    <span class="ticker-symbol">{result['ticker']}</span>
-                    <span class="ticker-price">${ind['price']:.2f}</span>
-                </div>
-                <span style="background: {badge_color}; color: #000; padding: 4px 12px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;">{badge_text}</span>
-            </div>
-            <span class="ticker-sector">{result['sector']}</span>
-            
-            <div class="levels-grid" style="margin-top: 1.5rem;">
-                <div class="level-item">
-                    <div class="level-value" style="color: #a78bfa;">{result['win_prob']}%</div>
-                    <div class="level-label">Probability</div>
-                </div>
-                <div class="level-item">
-                    <div class="level-value red">${pos['sl']:.2f}</div>
-                    <div class="level-label">Stop ({pos['sl_pct']:.1f}%)</div>
-                </div>
-                <div class="level-item">
-                    <div class="level-value green">${pos['tp']:.2f}</div>
-                    <div class="level-label">Target (+{pos['tp_pct']:.1f}%)</div>
-                </div>
-                <div class="level-item">
-                    <div class="level-value blue">{pos['shares']:.1f}</div>
-                    <div class="level-label">Shares</div>
-                </div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); color: #64748b; font-size: 0.85rem;">
-                <span>Risk: <span style="color: #f87171;">${pos['max_loss']:.0f}</span></span>
-                <span>Reward: <span style="color: #4ade80;">${pos['max_gain']:.0f}</span></span>
-                <span>R:R <span style="color: #60a5fa;">1:{pos['rr']:.1f}</span></span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Build HTML as single line
+        card_html = f'<div class="result-card" style="{card_style}">'
+        card_html += f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">'
+        card_html += f'<div class="ticker-display"><span class="ticker-symbol">{result["ticker"]}</span><span class="ticker-price">${ind["price"]:.2f}</span></div>'
+        card_html += f'<span style="background: {badge_color}; color: #000; padding: 4px 12px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;">{badge_text}</span>'
+        card_html += '</div>'
+        card_html += f'<span class="ticker-sector">{result["sector"]}</span>'
+        card_html += '<div class="levels-grid" style="margin-top: 1.5rem;">'
+        card_html += f'<div class="level-item"><div class="level-value" style="color: #a78bfa;">{result["win_prob"]}%</div><div class="level-label">Probability</div></div>'
+        card_html += f'<div class="level-item"><div class="level-value red">${pos["sl"]:.2f}</div><div class="level-label">Stop ({pos["sl_pct"]:.1f}%)</div></div>'
+        card_html += f'<div class="level-item"><div class="level-value green">${pos["tp"]:.2f}</div><div class="level-label">Target (+{pos["tp_pct"]:.1f}%)</div></div>'
+        card_html += f'<div class="level-item"><div class="level-value blue">{pos["shares"]:.1f}</div><div class="level-label">Shares</div></div>'
+        card_html += '</div>'
+        card_html += f'<div style="display: flex; justify-content: space-between; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); color: #64748b; font-size: 0.85rem;">'
+        card_html += f'<span>Risk: <span style="color: #f87171;">${pos["max_loss"]:.0f}</span></span>'
+        card_html += f'<span>Reward: <span style="color: #4ade80;">${pos["max_gain"]:.0f}</span></span>'
+        card_html += f'<span>R:R <span style="color: #60a5fa;">1:{pos["rr"]:.1f}</span></span>'
+        card_html += '</div></div>'
+        
+        st.markdown(card_html, unsafe_allow_html=True)
         
         # Expandable details for first signal only
         if i == 0:
@@ -1115,59 +1095,31 @@ if results and len(results) > 0:
                 st.plotly_chart(fig, use_container_width=True)
     
     # Expected returns box
-    avg_gain = 6.7  # Based on backtest
+    avg_gain = 6.7
     avg_loss = 3.3
-    win_rate = 0.45  # Conservative estimate
+    win_rate = 0.45
     expected_per_trade = (win_rate * avg_gain) - ((1-win_rate) * avg_loss)
     monthly_trades = 7
     monthly_return = expected_per_trade * monthly_trades
+    monthly_est = capital * monthly_return / 100
     
-    st.markdown(f"""
-    <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 16px; padding: 1.5rem; margin: 1.5rem 0;">
-        <div style="color: #a78bfa; font-weight: 600; font-size: 0.9rem; margin-bottom: 1rem;">📈 Rotation Strategy (Expected)</div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
-            <div>
-                <div style="font-size: 1.3rem; font-weight: 700; color: #fff;">~{monthly_trades}</div>
-                <div style="font-size: 0.7rem; color: #64748b;">TRADES/MONTH</div>
-            </div>
-            <div>
-                <div style="font-size: 1.3rem; font-weight: 700; color: #4ade80;">+{expected_per_trade:.1f}%</div>
-                <div style="font-size: 0.7rem; color: #64748b;">PER TRADE</div>
-            </div>
-            <div>
-                <div style="font-size: 1.3rem; font-weight: 700; color: #4ade80;">+${capital * monthly_return / 100:.0f}</div>
-                <div style="font-size: 0.7rem; color: #64748b;">MONTHLY EST.</div>
-            </div>
-        </div>
-        <div style="color: #64748b; font-size: 0.8rem; margin-top: 1rem; text-align: center;">
-            Based on ~45% win rate · +6.7% avg win · -3.3% avg loss
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    returns_html = f'<div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 16px; padding: 1.5rem; margin: 1.5rem 0;">'
+    returns_html += '<div style="color: #a78bfa; font-weight: 600; font-size: 0.9rem; margin-bottom: 1rem;">📈 Rotation Strategy (Expected)</div>'
+    returns_html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">'
+    returns_html += f'<div><div style="font-size: 1.3rem; font-weight: 700; color: #fff;">~{monthly_trades}</div><div style="font-size: 0.7rem; color: #64748b;">TRADES/MONTH</div></div>'
+    returns_html += f'<div><div style="font-size: 1.3rem; font-weight: 700; color: #4ade80;">+{expected_per_trade:.1f}%</div><div style="font-size: 0.7rem; color: #64748b;">PER TRADE</div></div>'
+    returns_html += f'<div><div style="font-size: 1.3rem; font-weight: 700; color: #4ade80;">+${monthly_est:.0f}</div><div style="font-size: 0.7rem; color: #64748b;">MONTHLY EST.</div></div>'
+    returns_html += '</div>'
+    returns_html += '<div style="color: #64748b; font-size: 0.8rem; margin-top: 1rem; text-align: center;">Based on ~45% win rate · +6.7% avg win · -3.3% avg loss</div>'
+    returns_html += '</div>'
+    st.markdown(returns_html, unsafe_allow_html=True)
 
 elif scan_btn:
-    st.markdown("""
-    <div class="empty-state">
-        <div class="empty-icon">◎</div>
-        <div class="empty-title">No Setups Today</div>
-        <div class="empty-text">
-            No stocks meet our 60%+ criteria right now.<br>
-            Check back tomorrow. Patience pays.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-title">No Setups Today</div><div class="empty-text">No stocks meet our 60%+ criteria right now. Check back tomorrow.</div></div>', unsafe_allow_html=True)
 
 else:
-    st.markdown(f"""
-    <div class="empty-state">
-        <div class="empty-icon">◎</div>
-        <div class="empty-title">Ready to Scan</div>
-        <div class="empty-text">
-            Scanning {len(ALL_TICKERS)} stocks for rotation opportunities.<br>
-            60%+ probability · 2:1 reward/risk · Take signals, rotate capital
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    ready_html = f'<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-title">Ready to Scan</div><div class="empty-text">Scanning {len(ALL_TICKERS)} stocks for rotation opportunities. 60%+ probability · 2:1 reward/risk</div></div>'
+    st.markdown(ready_html, unsafe_allow_html=True)
 
 # Backtest Section
 st.markdown("<hr>", unsafe_allow_html=True)
