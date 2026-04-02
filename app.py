@@ -25,7 +25,7 @@ st.set_page_config(
 )
 
 # ══════════════════════════════════════════════════════════════════
-#  APPLE-STYLE MINIMAL CSS
+#  GEN Z AESTHETIC CSS — Mesh Gradient + Glassmorphism
 # ══════════════════════════════════════════════════════════════════
 CSS = """
 <style>
@@ -33,9 +33,65 @@ CSS = """
     
     * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
     
+    /* Animated mesh gradient background */
+    .stApp {
+        background: #0a0a0f;
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.12) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.1) 0px, transparent 50%),
+            radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.12) 0px, transparent 50%);
+        min-height: 100vh;
+    }
+    
+    /* Floating orbs animation */
+    .stApp::before {
+        content: '';
+        position: fixed;
+        top: 20%;
+        left: 10%;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%);
+        border-radius: 50%;
+        filter: blur(60px);
+        animation: float1 20s ease-in-out infinite;
+        pointer-events: none;
+        z-index: -1;
+    }
+    
+    .stApp::after {
+        content: '';
+        position: fixed;
+        bottom: 20%;
+        right: 10%;
+        width: 250px;
+        height: 250px;
+        background: radial-gradient(circle, rgba(236, 72, 153, 0.25) 0%, transparent 70%);
+        border-radius: 50%;
+        filter: blur(60px);
+        animation: float2 15s ease-in-out infinite;
+        pointer-events: none;
+        z-index: -1;
+    }
+    
+    @keyframes float1 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(30px, -30px) scale(1.1); }
+        66% { transform: translate(-20px, 20px) scale(0.9); }
+    }
+    
+    @keyframes float2 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(-40px, 20px) scale(1.05); }
+        66% { transform: translate(30px, -40px) scale(0.95); }
+    }
+    
     .main .block-container { 
         max-width: 800px; 
-        padding: 2rem 1.5rem; 
+        padding: 2rem 1.5rem;
+        position: relative;
+        z-index: 1;
     }
     
     /* Hide Streamlit branding */
@@ -50,13 +106,16 @@ CSS = """
     .app-title {
         font-size: 2.5rem;
         font-weight: 600;
-        color: #ffffff;
+        background: linear-gradient(135deg, #fff 0%, #a78bfa 50%, #f472b6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         letter-spacing: -0.5px;
         margin: 0;
     }
     .app-subtitle {
         font-size: 1rem;
-        color: #86868b;
+        color: #94a3b8;
         font-weight: 400;
         margin-top: 0.5rem;
     }
@@ -71,32 +130,37 @@ CSS = """
         font-size: 0.85rem;
         font-weight: 500;
         margin: 1.5rem auto;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
     }
-    .market-bullish { background: rgba(48, 209, 88, 0.15); color: #30d158; }
-    .market-neutral { background: rgba(255, 214, 10, 0.15); color: #ffd60a; }
-    .market-bearish { background: rgba(255, 69, 58, 0.15); color: #ff453a; }
+    .market-bullish { background: rgba(48, 209, 88, 0.2); color: #4ade80; }
+    .market-neutral { background: rgba(255, 214, 10, 0.2); color: #fde047; }
+    .market-bearish { background: rgba(255, 69, 58, 0.2); color: #f87171; }
     
-    /* Scan Button */
+    /* Scan Button — Gradient glow */
     .stButton > button {
-        background: #0a84ff;
+        background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
         color: #fff;
         border: none;
-        border-radius: 12px;
+        border-radius: 14px;
         font-weight: 600;
         font-size: 1rem;
         padding: 1rem 2rem;
         width: 100%;
-        transition: all 0.2s ease;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
     }
     .stButton > button:hover {
-        background: #0077ed;
-        transform: scale(1.01);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 30px rgba(139, 92, 246, 0.6);
     }
     
-    /* Result Card */
+    /* Result Card — Glassmorphism */
     .result-card {
-        background: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 100%);
-        border-radius: 20px;
+        background: rgba(30, 30, 40, 0.6);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 24px;
         padding: 2rem;
         margin: 2rem 0;
     }
@@ -110,24 +174,28 @@ CSS = """
     .ticker-symbol {
         font-size: 3rem;
         font-weight: 700;
-        color: #fff;
+        background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         letter-spacing: -1px;
     }
     .ticker-price {
         font-size: 1.5rem;
-        color: #86868b;
+        color: #94a3b8;
         font-weight: 500;
     }
     .ticker-sector {
         display: inline-block;
-        background: rgba(255,255,255,0.1);
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(236, 72, 153, 0.3) 100%);
         color: #fff;
         padding: 4px 12px;
-        border-radius: 6px;
+        border-radius: 8px;
         font-size: 0.75rem;
         font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        border: 1px solid rgba(255,255,255,0.1);
     }
     
     /* Probability Circle */
@@ -138,12 +206,15 @@ CSS = """
     .prob-number {
         font-size: 5rem;
         font-weight: 700;
-        color: #30d158;
+        background: linear-gradient(135deg, #4ade80 0%, #22d3ee 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         line-height: 1;
     }
     .prob-label {
         font-size: 0.8rem;
-        color: #86868b;
+        color: #64748b;
         text-transform: uppercase;
         letter-spacing: 1px;
         margin-top: 0.5rem;
@@ -155,9 +226,11 @@ CSS = """
         grid-template-columns: repeat(4, 1fr);
         gap: 1rem;
         padding: 1.5rem;
-        background: rgba(0,0,0,0.3);
+        background: rgba(0,0,0,0.4);
+        backdrop-filter: blur(10px);
         border-radius: 16px;
         margin: 1.5rem 0;
+        border: 1px solid rgba(255,255,255,0.05);
     }
     .level-item {
         text-align: center;
@@ -168,26 +241,27 @@ CSS = """
     }
     .level-label {
         font-size: 0.7rem;
-        color: #86868b;
+        color: #64748b;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-top: 4px;
     }
-    .green { color: #30d158; }
-    .red { color: #ff453a; }
-    .blue { color: #0a84ff; }
+    .green { color: #4ade80; }
+    .red { color: #f87171; }
+    .blue { color: #60a5fa; }
     .white { color: #fff; }
     
     /* Capital Input Card */
     .capital-card {
-        background: rgba(10, 132, 255, 0.1);
-        border: 1px solid rgba(10, 132, 255, 0.3);
+        background: rgba(96, 165, 250, 0.1);
+        border: 1px solid rgba(96, 165, 250, 0.2);
         border-radius: 16px;
         padding: 1.5rem;
         margin: 1.5rem 0;
+        backdrop-filter: blur(10px);
     }
     .capital-title {
-        color: #0a84ff;
+        color: #60a5fa;
         font-weight: 600;
         font-size: 0.9rem;
         margin-bottom: 1rem;
@@ -195,14 +269,15 @@ CSS = """
     
     /* Trade Plan */
     .trade-plan {
-        background: rgba(48, 209, 88, 0.1);
-        border: 1px solid rgba(48, 209, 88, 0.3);
+        background: rgba(74, 222, 128, 0.1);
+        border: 1px solid rgba(74, 222, 128, 0.2);
         border-radius: 16px;
         padding: 1.5rem;
         margin: 1rem 0;
+        backdrop-filter: blur(10px);
     }
     .plan-title {
-        color: #30d158;
+        color: #4ade80;
         font-weight: 600;
         font-size: 0.9rem;
         margin-bottom: 1rem;
@@ -216,12 +291,13 @@ CSS = """
         color: #fff;
         font-size: 0.9rem;
     }
-    .plan-item span { color: #86868b; }
+    .plan-item span { color: #94a3b8; }
     
     /* Reason List */
     .reason-item {
         padding: 1rem;
-        background: rgba(255,255,255,0.05);
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.05);
         border-radius: 12px;
         margin: 0.5rem 0;
     }
@@ -231,7 +307,7 @@ CSS = """
         font-size: 0.9rem;
     }
     .reason-text {
-        color: #86868b;
+        color: #94a3b8;
         font-size: 0.85rem;
         margin-top: 4px;
     }
@@ -244,7 +320,10 @@ CSS = """
     .empty-icon {
         font-size: 4rem;
         margin-bottom: 1rem;
-        opacity: 0.5;
+        background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     .empty-title {
         font-size: 1.3rem;
@@ -253,7 +332,7 @@ CSS = """
         margin-bottom: 0.5rem;
     }
     .empty-text {
-        color: #86868b;
+        color: #94a3b8;
         font-size: 0.95rem;
         line-height: 1.6;
     }
@@ -278,8 +357,9 @@ CSS = """
         margin-bottom: 1.5rem;
     }
     .stat-box {
-        background: rgba(255,255,255,0.05);
-        border-radius: 12px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.05);
+        border-radius: 14px;
         padding: 1rem;
         text-align: center;
     }
@@ -290,7 +370,7 @@ CSS = """
     }
     .stat-label {
         font-size: 0.7rem;
-        color: #86868b;
+        color: #64748b;
         text-transform: uppercase;
         margin-top: 4px;
     }
@@ -300,7 +380,8 @@ CSS = """
         grid-template-columns: 80px 1fr 80px 80px;
         gap: 1rem;
         padding: 0.8rem 1rem;
-        background: rgba(255,255,255,0.03);
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.03);
         border-radius: 10px;
         margin: 0.3rem 0;
         align-items: center;
@@ -311,7 +392,7 @@ CSS = """
         color: #fff;
     }
     .signal-date {
-        color: #86868b;
+        color: #64748b;
     }
     .signal-result {
         text-align: right;
@@ -321,7 +402,7 @@ CSS = """
     /* Divider */
     hr {
         border: none;
-        border-top: 1px solid rgba(255,255,255,0.1);
+        border-top: 1px solid rgba(255,255,255,0.06);
         margin: 2rem 0;
     }
     
@@ -330,6 +411,20 @@ CSS = """
     input[type=number]::-webkit-outer-spin-button {
         -webkit-appearance: none;
         margin: 0;
+    }
+    
+    /* Input styling */
+    .stNumberInput input {
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-radius: 10px !important;
+        color: #fff !important;
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background: rgba(255,255,255,0.03) !important;
+        border-radius: 12px !important;
     }
 </style>
 """
