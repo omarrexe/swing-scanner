@@ -1171,32 +1171,33 @@ with tab1:
                 
                 # Supertrend indicator badge
                 st_badge = "🟢 ST" if ind.get("supertrend_bull", False) else "🔴 ST"
-                whale_badge = '<span class="whale-badge">🐋 WHALE</span>' if has_whale else ""
+                whale_badge_html = '<span class="whale-badge">🐋 WHALE</span>' if has_whale else ""
                 
-                st.markdown(f"""
-                <div class="pick-card {rank_class}">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
-                        <div>
-                            <span style="font-size:1.5rem;margin-right:0.5rem;">{rank_label}</span>
-                            <span class="ticker">{r['ticker']}</span>
-                            <span class="price">${ind['price']:.2f}</span>
-                            <span style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:0.75rem;color:#8b949e;margin-left:8px;">{sector}</span>
-                            <span style="font-size:0.75rem;margin-left:4px;">{st_badge}</span>
-                            {whale_badge}
-                        </div>
-                        <div style="text-align:right;">
-                            <div class="win-prob">{win_prob:.0f}%</div>
-                            <div class="win-label">Win Probability</div>
-                        </div>
-                    </div>
-                    <div class="levels">
-                        <span>Entry: <b>${ind['price']:.2f}</b></span>
-                        <span class="sl">Stop: <b>${pos['sl']:.2f}</b> (-{pos['sl_pct']:.1f}%)</span>
-                        <span class="tp">Target: <b>${pos['tp']:.2f}</b> (+{pos['tp_pct']:.1f}%)</span>
-                        <span>R:R <b>1:{pos['rr']:.1f}</b></span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                # Build the card HTML as a single string
+                card_html = f'''<div class="pick-card {rank_class}">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+<div>
+<span style="font-size:1.5rem;margin-right:0.5rem;">{rank_label}</span>
+<span class="ticker">{r['ticker']}</span>
+<span class="price">${ind['price']:.2f}</span>
+<span style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:0.75rem;color:#8b949e;margin-left:8px;">{sector}</span>
+<span style="font-size:0.75rem;margin-left:4px;">{st_badge}</span>
+{whale_badge_html}
+</div>
+<div style="text-align:right;">
+<div class="win-prob">{win_prob:.0f}%</div>
+<div class="win-label">Win Probability</div>
+</div>
+</div>
+<div class="levels">
+<span>Entry: <b>${ind['price']:.2f}</b></span>
+<span class="sl">Stop: <b>${pos['sl']:.2f}</b> (-{pos['sl_pct']:.1f}%)</span>
+<span class="tp">Target: <b>${pos['tp']:.2f}</b> (+{pos['tp_pct']:.1f}%)</span>
+<span>R:R <b>1:{pos['rr']:.1f}</b></span>
+</div>
+</div>'''
+                
+                st.markdown(card_html, unsafe_allow_html=True)
                 
                 # Show top reasons WHY this is a good pick
                 if reasons:
@@ -1205,22 +1206,14 @@ with tab1:
                         if has_whale and whale.get("signals"):
                             st.markdown("### 🐋 Smart Money Activity")
                             for sig in whale["signals"]:
-                                st.markdown(f"""
-                                <div class="whale-box">
-                                    <div class="whale-title">{sig['title']}</div>
-                                    <div class="whale-text">{sig['text']}</div>
-                                </div>
-                                """, unsafe_allow_html=True)
+                                whale_html = f'<div class="whale-box"><div class="whale-title">{sig["title"]}</div><div class="whale-text">{sig["text"]}</div></div>'
+                                st.markdown(whale_html, unsafe_allow_html=True)
                             st.markdown("---")
                         
                         st.markdown("### 📊 Technical Analysis")
                         for title, text in reasons:
-                            st.markdown(f"""
-                            <div class="reason-box">
-                                <div class="reason-title">{title}</div>
-                                <div class="reason-text">{text}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            reason_html = f'<div class="reason-box"><div class="reason-title">{title}</div><div class="reason-text">{text}</div></div>'
+                            st.markdown(reason_html, unsafe_allow_html=True)
                         
                         # Key metrics
                         st.markdown("---")
@@ -1304,13 +1297,8 @@ with tab2:
             
             for sig in whale_info["signals"]:
                 signal_color = "#6366f1" if "CALL" in sig["type"] or "BULLISH" in sig["type"] else "#f59e0b" if "PUT" in sig["type"] or "BEARISH" in sig["type"] else "#22c55e"
-                st.markdown(f"""
-                <div style="background:linear-gradient(135deg, #1a1a3a 0%, #1a2a4a 100%);
-                            border-left:4px solid {signal_color};padding:1rem;margin:0.8rem 0;border-radius:0 8px 8px 0;">
-                    <div style="color:#a5b4fc;font-weight:600;font-size:1rem;">{sig['title']}</div>
-                    <div style="color:#9ca3af;font-size:0.9rem;margin-top:0.5rem;">{sig['text']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                sig_html = f'<div style="background:linear-gradient(135deg, #1a1a3a 0%, #1a2a4a 100%);border-left:4px solid {signal_color};padding:1rem;margin:0.8rem 0;border-radius:0 8px 8px 0;"><div style="color:#a5b4fc;font-weight:600;font-size:1rem;">{sig["title"]}</div><div style="color:#9ca3af;font-size:0.9rem;margin-top:0.5rem;">{sig["text"]}</div></div>'
+                st.markdown(sig_html, unsafe_allow_html=True)
             
             # Also show basic price info
             try:
