@@ -89,6 +89,66 @@ Professional risk rules built-in:
 
 ---
 
+## 🤖 NEW: Auto-Trading Bot (bot.py)
+
+A standalone trading bot that runs independently and executes trades automatically!
+
+### Features
+- **Alpaca Paper Trading** — Practice with fake money (FREE)
+- **Telegram Alerts** — Get notified on your phone
+- **Market Hours Check** — Only trades during US market hours
+- **Market Regime Check** — Skips trading if market is bearish
+- **Position Check** — Won't buy if you already own the stock
+- **Bracket Orders** — Entry + Stop Loss + Take Profit
+
+### Market Hours (Cairo Time)
+The US stock market is open:
+- **Monday - Friday**
+- **~4:30 PM - 11:00 PM Cairo time** (varies with daylight saving)
+
+### Setup
+
+1. **Get Alpaca API Keys (FREE)**
+   - Sign up at [alpaca.markets](https://alpaca.markets)
+   - Go to Paper Trading → API Keys
+   - Copy your API Key and Secret Key
+
+2. **Create Telegram Bot (FREE)**
+   - Message [@BotFather](https://t.me/BotFather) on Telegram
+   - Send `/newbot` and follow the steps
+   - Copy the bot token
+   - Message [@userinfobot](https://t.me/userinfobot) to get your Chat ID
+
+3. **Configure the Bot**
+   ```bash
+   # Edit config.py with your keys
+   nano config.py
+   ```
+
+4. **Run the Bot**
+   ```bash
+   # Run once
+   python bot.py
+   
+   # Run in loop mode (checks every 30 min)
+   python bot.py --loop
+   ```
+
+### Deploy on PythonAnywhere (FREE)
+
+1. Sign up at [pythonanywhere.com](https://www.pythonanywhere.com) (free)
+2. Upload `bot.py`, `config.py`, `requirements.txt`
+3. Open a Bash console and run:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Go to **Tasks** tab → Add a new scheduled task:
+   - Command: `python /home/yourusername/bot.py`
+   - Schedule: Every hour (free tier) or every 30 min (paid)
+5. Done! Bot runs automatically during market hours.
+
+---
+
 ## ⚡ Technical Features
 
 - **Parallel scanning** — 10 threads for fast analysis
@@ -130,7 +190,9 @@ Live in ~2 minutes!
 
 ```
 swing-scanner/
-├── app.py              # Main application (all-in-one)
+├── app.py              # Main Streamlit scanner (web UI)
+├── bot.py              # Auto-trading bot (Alpaca + Telegram)
+├── config.py           # API keys and settings (EDIT THIS!)
 ├── requirements.txt    # Python dependencies
 ├── .gitignore          # Git ignore rules
 └── README.md           # This file
