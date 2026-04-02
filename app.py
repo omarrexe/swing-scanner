@@ -1,6 +1,6 @@
 """
-Swing Trading Scanner — Elite Edition
-Advanced algorithms for high-probability swing trade picks.
+Swing Trading Scanner — Elite Edition v2
+Advanced algorithms with Market Regime Detection & Sector Diversification.
 Shows only TOP 3 stocks with highest win probability.
 """
 
@@ -8,6 +8,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import pandas_ta as ta
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -35,6 +36,14 @@ CSS = """
     }
     .subheader { color: #666; font-size: 0.85rem; margin-bottom: 1rem; }
     
+    .market-status {
+        padding: 0.8rem 1.2rem; border-radius: 10px; margin-bottom: 1rem;
+        display: flex; align-items: center; gap: 1rem;
+    }
+    .market-bullish { background: #1a3d2e; border: 1px solid #238636; }
+    .market-bearish { background: #3d1a1a; border: 1px solid #f85149; }
+    .market-neutral { background: #3d3d1a; border: 1px solid #d29922; }
+    
     .pick-card {
         background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
         border: 2px solid #238636;
@@ -48,10 +57,12 @@ CSS = """
     
     .ticker { font-size: 1.6rem; font-weight: 700; color: #fff; }
     .price { font-size: 1.1rem; color: #8b949e; margin-left: 0.8rem; }
-    
-    .win-prob {
-        font-size: 2rem; font-weight: 700; color: #00ff88;
+    .sector-badge {
+        background: #21262d; padding: 0.2rem 0.5rem; border-radius: 4px;
+        font-size: 0.7rem; color: #8b949e; margin-left: 0.5rem;
     }
+    
+    .win-prob { font-size: 2rem; font-weight: 700; color: #00ff88; }
     .win-label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
     
     .reason-box {
@@ -79,188 +90,318 @@ CSS = """
         color: white; border: none; border-radius: 8px;
         font-weight: 600; padding: 0.6rem 1.5rem;
     }
-    
-    .metric-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
-    .metric-badge {
-        background: #21262d; padding: 0.3rem 0.6rem;
-        border-radius: 6px; font-size: 0.75rem; color: #8b949e;
-    }
-    .metric-badge.positive { background: #1a3d2e; color: #00ff88; }
-    .metric-badge.warning { background: #3d2e1a; color: #ffa500; }
 </style>
 """
 
 # ──────────────────────────────────────────────────────────────────
-#  STOCK UNIVERSE — High-liquidity swing trading candidates
+#  STOCK UNIVERSE WITH SECTORS — For diversification
 # ──────────────────────────────────────────────────────────────────
-ALL_TICKERS = [
-    # Tech Giants (best for swing trading - high liquidity)
-    "AAPL","MSFT","NVDA","AMD","META","GOOGL","TSLA","AMZN","NFLX","ADBE",
-    "CRM","ORCL","QCOM","AVGO","INTC","MU","PLTR","NOW","SNOW","PANW",
-    "CRWD","ZS","NET","DDOG","MDB","TEAM","SHOP","SQ","PYPL","AFRM",
-    # Finance
-    "JPM","BAC","GS","MS","V","MA","AXP","WFC","C","BLK","SCHW","COF",
-    # Growth / Momentum
-    "UBER","COIN","HOOD","SOFI","RBLX","SNAP","LYFT","ABNB","DASH","ROKU",
-    "TTD","PINS","ZM","DOCU","BILL","HUBS","WDAY","VEEV","OKTA","TWLO",
-    # Crypto / Mining
-    "MARA","RIOT","CLSK","CIFR","HUT","BTBT","BITF",
-    # Healthcare / Biotech
-    "LLY","PFE","ABBV","MRK","JNJ","GILD","AMGN","BIIB","REGN","VRTX",
-    "MRNA","BNTX","ISRG","DXCM","ILMN","BMY","UNH","CVS","CI","HUM",
-    # Energy / Materials
-    "XOM","CVX","SLB","FCX","NEM","AA","MOS","CLF","X","VALE",
-    "OXY","DVN","EOG","PXD","HAL","BKR",
+STOCK_SECTORS = {
+    # Tech - Software
+    "AAPL": "Tech", "MSFT": "Tech", "GOOGL": "Tech", "META": "Tech", "AMZN": "Tech",
+    "NFLX": "Tech", "ADBE": "Tech", "CRM": "Tech", "ORCL": "Tech", "NOW": "Tech",
+    "SNOW": "Tech", "PANW": "Tech", "CRWD": "Tech", "ZS": "Tech", "NET": "Tech",
+    "DDOG": "Tech", "MDB": "Tech", "TEAM": "Tech", "SHOP": "Tech", "PLTR": "Tech",
+    # Tech - Semiconductors
+    "NVDA": "Semis", "AMD": "Semis", "QCOM": "Semis", "AVGO": "Semis", "INTC": "Semis",
+    "MU": "Semis", "TSM": "Semis",
+    # Tech - Fintech
+    "SQ": "Fintech", "PYPL": "Fintech", "AFRM": "Fintech", "SOFI": "Fintech",
+    "COIN": "Fintech", "HOOD": "Fintech",
+    # Finance - Banks
+    "JPM": "Finance", "BAC": "Finance", "GS": "Finance", "MS": "Finance",
+    "WFC": "Finance", "C": "Finance", "BLK": "Finance", "SCHW": "Finance", "COF": "Finance",
+    # Finance - Payments
+    "V": "Payments", "MA": "Payments", "AXP": "Payments",
     # Consumer / Retail
-    "WMT","COST","TGT","HD","LOW","NKE","SBUX","MCD","DIS","CMCSA",
-    "LULU","DECK","ONON","CROX","ETSY","W","CHWY",
+    "WMT": "Retail", "COST": "Retail", "TGT": "Retail", "HD": "Retail", "LOW": "Retail",
+    "NKE": "Retail", "SBUX": "Retail", "MCD": "Retail", "LULU": "Retail", "DECK": "Retail",
+    "ONON": "Retail", "CROX": "Retail", "ETSY": "Retail", "W": "Retail", "CHWY": "Retail",
+    # Media / Entertainment
+    "DIS": "Media", "CMCSA": "Media", "ROKU": "Media", "SNAP": "Media", "PINS": "Media",
+    "RBLX": "Media", "TTD": "Media", "ZM": "Media",
+    # Travel / Mobility
+    "UBER": "Travel", "LYFT": "Travel", "ABNB": "Travel", "DASH": "Travel",
+    # Healthcare / Biotech
+    "LLY": "Health", "PFE": "Health", "ABBV": "Health", "MRK": "Health", "JNJ": "Health",
+    "GILD": "Health", "AMGN": "Health", "BIIB": "Health", "REGN": "Health", "VRTX": "Health",
+    "MRNA": "Health", "BNTX": "Health", "ISRG": "Health", "DXCM": "Health", "ILMN": "Health",
+    "BMY": "Health", "UNH": "Health", "CVS": "Health", "CI": "Health", "HUM": "Health",
+    # Energy
+    "XOM": "Energy", "CVX": "Energy", "SLB": "Energy", "OXY": "Energy", "DVN": "Energy",
+    "EOG": "Energy", "PXD": "Energy", "HAL": "Energy", "BKR": "Energy",
+    # Materials / Mining
+    "FCX": "Materials", "NEM": "Materials", "AA": "Materials", "MOS": "Materials",
+    "CLF": "Materials", "X": "Materials", "VALE": "Materials",
+    # Crypto Mining
+    "MARA": "Crypto", "RIOT": "Crypto", "CLSK": "Crypto", "CIFR": "Crypto",
+    "HUT": "Crypto", "BTBT": "Crypto", "BITF": "Crypto",
     # Industrial / Aerospace
-    "BA","CAT","DE","UNP","UPS","FDX","GE","RTX","LMT","NOC",
+    "BA": "Industrial", "CAT": "Industrial", "DE": "Industrial", "UNP": "Industrial",
+    "UPS": "Industrial", "FDX": "Industrial", "GE": "Industrial", "RTX": "Industrial",
+    "LMT": "Industrial", "NOC": "Industrial",
     # EV / Clean Energy
-    "RIVN","LCID","NIO","XPEV","LI","ENPH","SEDG","FSLR","RUN",
-    # ETFs (for market comparison)
-    "SPY","QQQ","IWM",
-]
+    "TSLA": "EV", "RIVN": "EV", "LCID": "EV", "NIO": "EV", "XPEV": "EV", "LI": "EV",
+    "ENPH": "Clean", "SEDG": "Clean", "FSLR": "Clean", "RUN": "Clean",
+    # SaaS / Cloud
+    "DOCU": "SaaS", "BILL": "SaaS", "HUBS": "SaaS", "WDAY": "SaaS", "VEEV": "SaaS",
+    "OKTA": "SaaS", "TWLO": "SaaS",
+}
+
+ALL_TICKERS = list(STOCK_SECTORS.keys())
 
 # ──────────────────────────────────────────────────────────────────
-#  CONFIGURATION — Ultra-strict for TOP picks only
+#  CONFIGURATION
 # ──────────────────────────────────────────────────────────────────
 CFG = {
     "sl_atr_mult"       : 1.5,
     "tp_atr_mult"       : 3.5,
     "min_rr"            : 2.0,
-    "min_win_prob"      : 65,       # Only show 65%+ win probability
-    "min_profit_pct"    : 6.0,      # Minimum 6% profit potential
-    "rsi_sweet_min"     : 40,       # RSI sweet spot
-    "rsi_sweet_max"     : 60,
+    "min_win_prob"      : 65,
+    "min_profit_pct"    : 6.0,
     "risk_per_trade_pct": 1.5,
     "max_position_pct"  : 30.0,
     "scan_threads"      : 10,
-    "max_results"       : 3,        # Show only TOP 3 picks
+    "max_results"       : 3,
 }
 
 # ──────────────────────────────────────────────────────────────────
-#  ADVANCED DATA & INDICATORS
+#  MARKET REGIME DETECTION — Check SPY before trading
+# ──────────────────────────────────────────────────────────────────
+@st.cache_data(ttl=300)
+def get_market_regime():
+    """
+    Analyze SPY to determine if market is BULLISH, BEARISH, or NEUTRAL.
+    This is CRITICAL — we don't want to go long in a bear market.
+    """
+    try:
+        spy = yf.Ticker("SPY")
+        df = spy.history(period="6mo", interval="1d")
+        if df.empty or len(df) < 50:
+            return "NEUTRAL", 0, "Unable to fetch SPY data"
+        
+        df.columns = [c.lower() for c in df.columns]
+        c = df["close"]
+        
+        # Calculate indicators using pandas-ta
+        df.ta.ema(length=20, append=True)
+        df.ta.ema(length=50, append=True)
+        df.ta.rsi(length=14, append=True)
+        df.ta.adx(length=14, append=True)
+        df.ta.supertrend(length=10, multiplier=3, append=True)
+        
+        price = float(c.iloc[-1])
+        ema20 = float(df["EMA_20"].iloc[-1])
+        ema50 = float(df["EMA_50"].iloc[-1])
+        rsi = float(df["RSI_14"].iloc[-1]) if "RSI_14" in df.columns else 50
+        adx = float(df["ADX_14"].iloc[-1]) if "ADX_14" in df.columns else 20
+        
+        # Supertrend direction
+        st_col = [col for col in df.columns if "SUPERTd" in col]
+        supertrend_bull = int(df[st_col[0]].iloc[-1]) == 1 if st_col else True
+        
+        # 20-day performance
+        chg_20d = (price - float(c.iloc[-20])) / float(c.iloc[-20]) * 100
+        
+        # Scoring
+        score = 0
+        reasons = []
+        
+        # Trend alignment
+        if price > ema20 > ema50:
+            score += 30
+            reasons.append("SPY above EMA20 & EMA50")
+        elif price > ema50:
+            score += 15
+            reasons.append("SPY above EMA50")
+        else:
+            score -= 20
+            reasons.append("SPY below key moving averages")
+        
+        # Supertrend
+        if supertrend_bull:
+            score += 25
+            reasons.append("Supertrend bullish")
+        else:
+            score -= 25
+            reasons.append("Supertrend bearish")
+        
+        # RSI
+        if 45 <= rsi <= 70:
+            score += 15
+            reasons.append(f"RSI healthy at {rsi:.0f}")
+        elif rsi < 40:
+            score -= 10
+            reasons.append(f"RSI weak at {rsi:.0f}")
+        elif rsi > 75:
+            score += 5  # Overbought but still bullish
+            reasons.append(f"RSI overbought {rsi:.0f}")
+        
+        # Momentum
+        if chg_20d > 3:
+            score += 20
+            reasons.append(f"SPY up {chg_20d:.1f}% in 20 days")
+        elif chg_20d > 0:
+            score += 10
+            reasons.append(f"SPY up {chg_20d:.1f}% in 20 days")
+        else:
+            score -= 15
+            reasons.append(f"SPY down {chg_20d:.1f}% in 20 days")
+        
+        # Trend strength
+        if adx > 25:
+            score += 10
+            reasons.append(f"Strong trend (ADX {adx:.0f})")
+        
+        # Determine regime
+        if score >= 50:
+            regime = "BULLISH"
+            msg = "🟢 Market is BULLISH — Good conditions for swing trading"
+        elif score >= 20:
+            regime = "NEUTRAL"
+            msg = "🟡 Market is NEUTRAL — Be selective with trades"
+        else:
+            regime = "BEARISH"
+            msg = "🔴 Market is BEARISH — Avoid long positions"
+        
+        return regime, score, msg, reasons, {
+            "price": price, "ema20": ema20, "ema50": ema50,
+            "rsi": rsi, "adx": adx, "chg_20d": chg_20d
+        }
+        
+    except Exception as e:
+        return "NEUTRAL", 0, f"Error: {str(e)}", [], {}
+
+# ──────────────────────────────────────────────────────────────────
+#  DATA FETCHING WITH PANDAS-TA
 # ──────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
 def fetch_data(ticker: str):
-    """Fetch price data and compute advanced indicators."""
+    """Fetch price data and compute indicators using pandas-ta."""
     try:
         t = yf.Ticker(ticker)
-        df = t.history(period="1y", interval="1d", auto_adjust=True)  # 1 year for better analysis
+        df = t.history(period="1y", interval="1d", auto_adjust=True)
         news = t.news or []
         if df.empty or len(df) < 100:
             return None, None, []
         df.columns = [c.lower() for c in df.columns]
-
+        
         c, h, l, v = df["close"], df["high"], df["low"], df["volume"]
         price = float(c.iloc[-1])
-
-        # EMAs for trend
-        ema8  = c.ewm(span=8,  adjust=False).mean()
-        ema21 = c.ewm(span=21, adjust=False).mean()
-        ema50 = c.ewm(span=50, adjust=False).mean()
-        ema200 = c.ewm(span=200, adjust=False).mean()
-
+        
+        # ═══════════════════════════════════════════════════════════
+        # Use pandas-ta for all indicators (faster & more accurate)
+        # ═══════════════════════════════════════════════════════════
+        
+        # EMAs
+        df.ta.ema(length=8, append=True)
+        df.ta.ema(length=21, append=True)
+        df.ta.ema(length=50, append=True)
+        df.ta.ema(length=200, append=True)
+        
         # RSI
-        d = c.diff()
-        gain = d.clip(lower=0).rolling(14).mean()
-        loss = (-d.clip(upper=0)).rolling(14).mean()
-        rsi = 100 - (100 / (1 + gain / loss))
-
+        df.ta.rsi(length=14, append=True)
+        
         # MACD
-        ema12 = c.ewm(span=12, adjust=False).mean()
-        ema26 = c.ewm(span=26, adjust=False).mean()
-        macd_line = ema12 - ema26
-        signal_line = macd_line.ewm(span=9, adjust=False).mean()
-        macd_hist = macd_line - signal_line
-
-        # ATR (Average True Range)
-        tr = pd.concat([h-l, (h-c.shift()).abs(), (l-c.shift()).abs()], axis=1).max(axis=1)
-        atr = tr.rolling(14).mean()
-
-        # ADX (Average Directional Index) - Trend Strength
-        plus_dm = h.diff().clip(lower=0)
-        minus_dm = (-l.diff()).clip(lower=0)
-        plus_dm[plus_dm < minus_dm] = 0
-        minus_dm[minus_dm < plus_dm] = 0
-        tr_smooth = tr.rolling(14).sum()
-        plus_di = 100 * (plus_dm.rolling(14).sum() / tr_smooth)
-        minus_di = 100 * (minus_dm.rolling(14).sum() / tr_smooth)
-        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di + 1e-9)
-        adx = dx.rolling(14).mean()
-
+        df.ta.macd(fast=12, slow=26, signal=9, append=True)
+        
+        # ATR
+        df.ta.atr(length=14, append=True)
+        
+        # ADX (Trend Strength)
+        df.ta.adx(length=14, append=True)
+        
         # Bollinger Bands
-        sma20 = c.rolling(20).mean()
-        std20 = c.rolling(20).std()
-        bb_upper = sma20 + 2 * std20
-        bb_lower = sma20 - 2 * std20
-        bb_pos = (c - bb_lower) / (bb_upper - bb_lower + 1e-9)
-
-        # VWAP
+        df.ta.bbands(length=20, std=2, append=True)
+        
+        # Supertrend (new! great for trend confirmation)
+        df.ta.supertrend(length=10, multiplier=3, append=True)
+        
+        # VWAP (approximate using cumulative)
         vwap = (c * v).cumsum() / v.cumsum()
-
-        # Volume analysis
+        
+        # Volume ratio
         vol_sma20 = v.rolling(20).mean()
         vol_ratio = v / vol_sma20
-
-        # Relative Strength vs SPY (market)
+        
+        # Get values from pandas-ta columns
+        ema8 = df["EMA_8"].iloc[-1] if "EMA_8" in df.columns else price
+        ema21 = df["EMA_21"].iloc[-1] if "EMA_21" in df.columns else price
+        ema50 = df["EMA_50"].iloc[-1] if "EMA_50" in df.columns else price
+        ema200 = df["EMA_200"].iloc[-1] if "EMA_200" in df.columns else price
+        
+        rsi = df["RSI_14"].iloc[-1] if "RSI_14" in df.columns else 50
+        rsi_prev = df["RSI_14"].iloc[-2] if "RSI_14" in df.columns else 50
+        rsi_5d = df["RSI_14"].iloc[-5] if "RSI_14" in df.columns and len(df) >= 5 else 50
+        
+        macd_hist = df["MACDh_12_26_9"].iloc[-1] if "MACDh_12_26_9" in df.columns else 0
+        macd_hist_prev = df["MACDh_12_26_9"].iloc[-2] if "MACDh_12_26_9" in df.columns else 0
+        macd_line = df["MACD_12_26_9"].iloc[-1] if "MACD_12_26_9" in df.columns else 0
+        signal_line = df["MACDs_12_26_9"].iloc[-1] if "MACDs_12_26_9" in df.columns else 0
+        
+        atr = df["ATRr_14"].iloc[-1] if "ATRr_14" in df.columns else price * 0.02
+        
+        adx = df["ADX_14"].iloc[-1] if "ADX_14" in df.columns else 20
+        plus_di = df["DMP_14"].iloc[-1] if "DMP_14" in df.columns else 20
+        minus_di = df["DMN_14"].iloc[-1] if "DMN_14" in df.columns else 20
+        
+        # Bollinger Band position
+        bb_upper = df["BBU_20_2.0"].iloc[-1] if "BBU_20_2.0" in df.columns else price * 1.02
+        bb_lower = df["BBL_20_2.0"].iloc[-1] if "BBL_20_2.0" in df.columns else price * 0.98
+        bb_pos = (price - bb_lower) / (bb_upper - bb_lower + 1e-9)
+        
+        # Supertrend direction (1 = bullish, -1 = bearish)
+        st_col = [col for col in df.columns if "SUPERTd" in col]
+        supertrend_bull = int(df[st_col[0]].iloc[-1]) == 1 if st_col else True
+        
+        # Relative Strength vs SPY
         try:
-            spy = yf.Ticker("SPY").history(period="1y", interval="1d")["Close"]
-            if len(spy) >= len(c):
-                spy = spy.iloc[-len(c):]
-                rs_vs_spy = (c.pct_change(20) - spy.pct_change(20).values) * 100
+            spy_data = yf.Ticker("SPY").history(period="1y", interval="1d")["Close"]
+            if len(spy_data) >= 20:
+                stock_chg = (c.iloc[-1] - c.iloc[-20]) / c.iloc[-20] * 100
+                spy_chg = (spy_data.iloc[-1] - spy_data.iloc[-20]) / spy_data.iloc[-20] * 100
+                rs_vs_spy = stock_chg - spy_chg
             else:
-                rs_vs_spy = pd.Series([0] * len(c), index=c.index)
+                rs_vs_spy = 0
         except:
-            rs_vs_spy = pd.Series([0] * len(c), index=c.index)
-
-        # Consolidation detection (tight range before breakout)
-        range_20d = (h.rolling(20).max() - l.rolling(20).min()) / c * 100
-        consolidating = range_20d < atr / c * 100 * 3
-
-        # Pullback to EMA detection
-        dist_to_ema21 = (c - ema21) / c * 100
-
-        # Support/Resistance levels
+            rs_vs_spy = 0
+        
+        # Breakout detection
         recent_high = h.rolling(20).max()
-        recent_low = l.rolling(20).min()
-        near_breakout = (c.iloc[-1] > recent_high.iloc[-2] * 0.98)
-
+        near_breakout = price > float(recent_high.iloc[-2]) * 0.98
+        
+        # Consolidation (tight range)
+        range_20d = (h.rolling(20).max() - l.rolling(20).min()) / c * 100
+        consolidating = float(range_20d.iloc[-1]) < float(atr) / price * 100 * 3
+        
+        # Distance to EMA21
+        dist_to_ema21 = (price - ema21) / price * 100
+        
         ind = {
-            "price"       : price,
-            "ema8"        : float(ema8.iloc[-1]),
-            "ema21"       : float(ema21.iloc[-1]),
-            "ema50"       : float(ema50.iloc[-1]),
-            "ema200"      : float(ema200.iloc[-1]) if len(ema200) >= 200 else price,
-            "rsi"         : float(rsi.iloc[-1]),
-            "rsi_prev"    : float(rsi.iloc[-2]),
-            "rsi_5d_ago"  : float(rsi.iloc[-5]) if len(rsi) >= 5 else 50,
-            "macd_hist"   : float(macd_hist.iloc[-1]),
-            "macd_prev"   : float(macd_hist.iloc[-2]),
-            "macd_line"   : float(macd_line.iloc[-1]),
-            "signal_line" : float(signal_line.iloc[-1]),
-            "atr"         : float(atr.iloc[-1]),
-            "atr_pct"     : float(atr.iloc[-1]) / price * 100,
-            "adx"         : float(adx.iloc[-1]) if not np.isnan(adx.iloc[-1]) else 20,
-            "plus_di"     : float(plus_di.iloc[-1]) if not np.isnan(plus_di.iloc[-1]) else 20,
-            "minus_di"    : float(minus_di.iloc[-1]) if not np.isnan(minus_di.iloc[-1]) else 20,
-            "bb_pos"      : float(bb_pos.iloc[-1]),
-            "vwap"        : float(vwap.iloc[-1]),
-            "vol_ratio"   : float(vol_ratio.iloc[-1]),
-            "vol_5d_avg"  : float(v.iloc[-5:].mean()),
-            "rs_vs_spy"   : float(rs_vs_spy.iloc[-1]) if not np.isnan(rs_vs_spy.iloc[-1]) else 0,
-            "consolidating": bool(consolidating.iloc[-1]),
-            "dist_to_ema21": float(dist_to_ema21.iloc[-1]),
+            "price": price,
+            "ema8": float(ema8), "ema21": float(ema21), 
+            "ema50": float(ema50), "ema200": float(ema200),
+            "rsi": float(rsi), "rsi_prev": float(rsi_prev), "rsi_5d_ago": float(rsi_5d),
+            "macd_hist": float(macd_hist), "macd_prev": float(macd_hist_prev),
+            "macd_line": float(macd_line), "signal_line": float(signal_line),
+            "atr": float(atr), "atr_pct": float(atr) / price * 100,
+            "adx": float(adx) if not np.isnan(adx) else 20,
+            "plus_di": float(plus_di) if not np.isnan(plus_di) else 20,
+            "minus_di": float(minus_di) if not np.isnan(minus_di) else 20,
+            "bb_pos": float(bb_pos),
+            "vwap": float(vwap.iloc[-1]),
+            "vol_ratio": float(vol_ratio.iloc[-1]),
+            "supertrend_bull": supertrend_bull,
+            "rs_vs_spy": float(rs_vs_spy),
             "near_breakout": near_breakout,
-            "chg_1d"      : float((c.iloc[-1] - c.iloc[-2]) / c.iloc[-2] * 100),
-            "chg_5d"      : float((c.iloc[-1] - c.iloc[-5]) / c.iloc[-5] * 100),
-            "chg_20d"     : float((c.iloc[-1] - c.iloc[-20]) / c.iloc[-20] * 100),
-            "high_52w"    : float(h.iloc[-252:].max()) if len(h) >= 252 else float(h.max()),
-            "low_52w"     : float(l.iloc[-252:].min()) if len(l) >= 252 else float(l.min()),
+            "consolidating": consolidating,
+            "dist_to_ema21": float(dist_to_ema21),
+            "chg_1d": float((c.iloc[-1] - c.iloc[-2]) / c.iloc[-2] * 100),
+            "chg_5d": float((c.iloc[-1] - c.iloc[-5]) / c.iloc[-5] * 100),
+            "chg_20d": float((c.iloc[-1] - c.iloc[-20]) / c.iloc[-20] * 100),
         }
         return ind, df, news
-    except Exception:
+    except Exception as e:
         return None, None, []
 
 
@@ -438,7 +579,18 @@ def calculate_win_probability(ind, ns):
         score += 5
     
     # ═══════════════════════════════════════════════════════════════
-    # 9. NEWS CATALYST (5 points max)
+    # 9. SUPERTREND CONFIRMATION (10 points max) — NEW!
+    # ═══════════════════════════════════════════════════════════════
+    max_score += 10
+    
+    if ind.get("supertrend_bull", False):
+        score += 10
+        reasons.append(("📊 Supertrend Bullish", "Supertrend indicator confirms uptrend. Strong buy signal."))
+    else:
+        score -= 3  # Penalty for bearish supertrend
+    
+    # ═══════════════════════════════════════════════════════════════
+    # 10. NEWS CATALYST (5 points max)
     # ═══════════════════════════════════════════════════════════════
     max_score += 5
     
@@ -465,6 +617,9 @@ def calculate_win_probability(ind, ns):
     # Penalty for bearish MACD
     if ind["macd_hist"] < 0 and ind["macd_hist"] < ind["macd_prev"]:
         raw_prob *= 0.8
+    # Penalty for bearish Supertrend
+    if not ind.get("supertrend_bull", True):
+        raw_prob *= 0.85
     
     win_prob = min(95, max(0, raw_prob))  # Cap at 95%
     
@@ -531,10 +686,10 @@ def analyze_ticker(ticker, capital):
     }
 
 # ──────────────────────────────────────────────────────────────────
-#  PARALLEL SCANNER
+#  PARALLEL SCANNER WITH SECTOR DIVERSIFICATION
 # ──────────────────────────────────────────────────────────────────
-def scan_market_parallel(tickers, capital, progress_callback=None):
-    """Scan multiple tickers in parallel, return only top picks."""
+def scan_market_parallel(tickers, capital, progress_callback=None, diversify=True):
+    """Scan multiple tickers in parallel, return diversified top picks."""
     results = []
     total = len(tickers)
     completed = 0
@@ -549,10 +704,39 @@ def scan_market_parallel(tickers, capital, progress_callback=None):
             
             result = future.result()
             if result is not None:
+                # Add sector info
+                result["sector"] = STOCK_SECTORS.get(result["ticker"], "Other")
                 results.append(result)
     
-    # Sort by WIN PROBABILITY (highest first) - this is the key ranking
+    # Sort by WIN PROBABILITY (highest first)
     results.sort(key=lambda x: x["win_prob"], reverse=True)
+    
+    # ═══════════════════════════════════════════════════════════════
+    # SECTOR DIVERSIFICATION: Ensure top picks aren't all same sector
+    # ═══════════════════════════════════════════════════════════════
+    if diversify and len(results) > 3:
+        diversified = []
+        sectors_used = set()
+        
+        for result in results:
+            sector = result["sector"]
+            # Take best from each sector, max 2 from same sector
+            if sectors_used.count(sector) if isinstance(sectors_used, list) else list(sectors_used).count(sector) < 2:
+                diversified.append(result)
+                sectors_used.add(sector)
+            if len(diversified) >= CFG["max_results"]:
+                break
+        
+        # If we couldn't fill all slots with diversified, add remaining top picks
+        if len(diversified) < CFG["max_results"]:
+            for result in results:
+                if result not in diversified:
+                    diversified.append(result)
+                if len(diversified) >= CFG["max_results"]:
+                    break
+        
+        return diversified
+    
     return results[:CFG["max_results"]]
 
 
@@ -616,13 +800,52 @@ if "scan_results" not in st.session_state:
     st.session_state["scan_results"] = None
 if "capital" not in st.session_state:
     st.session_state["capital"] = 10000.0
+if "market_regime" not in st.session_state:
+    st.session_state["market_regime"] = None
 
 # Inject CSS
 st.markdown(CSS, unsafe_allow_html=True)
 
 # Header
 st.markdown('<div class="header">⚡ ELITE SWING PICKS</div>', unsafe_allow_html=True)
-st.markdown('<div class="subheader">Advanced AI Analysis · Top 3 High-Probability Setups · 65%+ Win Rate Filter</div>', unsafe_allow_html=True)
+st.markdown('<div class="subheader">Phase 1: Market Regime + Sector Diversification + Supertrend + pandas-ta</div>', unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════════
+# MARKET REGIME DISPLAY - Check market condition before scanning
+# ═══════════════════════════════════════════════════════════════════
+regime, regime_score, regime_msg, regime_reasons, spy_data = get_market_regime()
+st.session_state["market_regime"] = regime
+
+if regime == "BULLISH":
+    regime_color = "#00ff88"
+    regime_icon = "🟢"
+    regime_msg = "Market is BULLISH — Great time for swing trades!"
+elif regime == "NEUTRAL":
+    regime_color = "#ffd700"
+    regime_icon = "🟡"
+    regime_msg = "Market is NEUTRAL — Be selective, trade quality setups only."
+else:  # BEARISH
+    regime_color = "#f85149"
+    regime_icon = "🔴"
+    regime_msg = "Market is BEARISH — High risk! Consider staying in cash."
+
+st.markdown(f"""
+<div style="background: linear-gradient(135deg, #161b22 0%, #0d1117 100%); 
+            border: 1px solid {regime_color}40; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <span style="font-size: 1.1em; font-weight: bold; color: {regime_color};">{regime_icon} MARKET REGIME: {regime}</span>
+            <span style="color: #8b949e; margin-left: 12px;">(SPY Score: {regime_score}/100)</span>
+        </div>
+        <div style="color: #8b949e; font-size: 0.9em;">{regime_msg}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Show regime analysis details in expander
+with st.expander("📊 Market Analysis Details"):
+    for reason in regime_reasons:
+        st.markdown(f"• {reason}")
 
 # Controls row
 col_cap, col_scan, col_search = st.columns([2, 2, 3])
@@ -702,9 +925,9 @@ if results is not None:
         </div>
         """, unsafe_allow_html=True)
     else:
-        # Header
+        # Header with diversification note
         st.markdown(f"### 🏆 TOP {len(results)} HIGH-PROBABILITY PICKS")
-        st.markdown(f"*Ranked by win probability · Scanned {len(ALL_TICKERS)} stocks · Only showing 65%+ setups*")
+        st.markdown(f"*Diversified by sector · Scanned {len(ALL_TICKERS)} stocks · Only showing 65%+ setups*")
         
         # Display picks with rank
         rank_labels = ["🥇", "🥈", "🥉"]
@@ -715,9 +938,13 @@ if results is not None:
             pos = r["pos"]
             win_prob = r["win_prob"]
             reasons = r["reasons"]
+            sector = r.get("sector", "Unknown")
             
             rank_label = rank_labels[i] if i < 3 else f"#{i+1}"
             rank_class = rank_classes[i] if i < 3 else ""
+            
+            # Supertrend indicator badge
+            st_badge = "🟢 ST" if ind.get("supertrend_bull", False) else "🔴 ST"
             
             st.markdown(f"""
             <div class="pick-card {rank_class}">
@@ -726,6 +953,8 @@ if results is not None:
                         <span style="font-size:1.5rem;margin-right:0.5rem;">{rank_label}</span>
                         <span class="ticker">{r['ticker']}</span>
                         <span class="price">${ind['price']:.2f}</span>
+                        <span style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:0.75rem;color:#8b949e;margin-left:8px;">{sector}</span>
+                        <span style="font-size:0.75rem;margin-left:4px;">{st_badge}</span>
                     </div>
                     <div style="text-align:right;">
                         <div class="win-prob">{win_prob:.0f}%</div>
