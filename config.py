@@ -7,8 +7,8 @@ Fill in your API keys below.
 # ALPACA API (Paper Trading - FREE)
 # Get your keys at: https://app.alpaca.markets/paper/dashboard/overview
 # ══════════════════════════════════════════════════════════════════
-ALPACA_API_KEY = "YOUR_ALPACA_API_KEY"
-ALPACA_SECRET_KEY = "YOUR_ALPACA_SECRET_KEY"
+ALPACA_API_KEY = "PKUIYFPM52QKOEX2ZJBDQG5RT4"
+ALPACA_SECRET_KEY = "CohzB2zqoA7z4WTBthJcAjZFzZFToonSeFr89j2hZv9K"
 ALPACA_BASE_URL = "https://paper-api.alpaca.markets"  # Paper trading (fake money)
 
 # ══════════════════════════════════════════════════════════════════
@@ -17,8 +17,8 @@ ALPACA_BASE_URL = "https://paper-api.alpaca.markets"  # Paper trading (fake mone
 # 2. You'll get a token like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz
 # 3. Message @userinfobot to get your Chat ID
 # ══════════════════════════════════════════════════════════════════
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
+TELEGRAM_BOT_TOKEN = "8793845041:AAFnsCf1gAphnv8FiPW996kDYQ-cv47Zt-U"
+TELEGRAM_CHAT_ID = "8334931903"
 
 # ══════════════════════════════════════════════════════════════════
 # BOT SETTINGS

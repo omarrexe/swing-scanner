@@ -362,6 +362,114 @@ def detect_smart_money(ticker: str):
     }
 
 # ──────────────────────────────────────────────────────────────────
+#  EARNINGS FILTER — Skip stocks near earnings (gambling, not trading)
+# ──────────────────────────────────────────────────────────────────
+@st.cache_data(ttl=3600)
+def check_earnings(ticker: str, days_threshold: int = 5):
+    """
+    Check if stock has earnings within the next X days.
+    Returns: (has_earnings_soon: bool, days_until: int or None, earnings_date: str or None)
+    """
+    try:
+        t = yf.Ticker(ticker)
+        calendar = t.calendar
+        
+        if calendar is None or calendar.empty:
+            return False, None, None
+        
+        # Try to get earnings date
+        earnings_date = None
+        if 'Earnings Date' in calendar.index:
+            earnings_date = calendar.loc['Earnings Date']
+            if isinstance(earnings_date, pd.Series):
+                earnings_date = earnings_date.iloc[0]
+        elif len(calendar.columns) > 0 and 'Earnings Date' in calendar.columns:
+            earnings_date = calendar['Earnings Date'].iloc[0]
+        
+        if earnings_date is None:
+            return False, None, None
+        
+        # Convert to datetime
+        if isinstance(earnings_date, str):
+            earnings_date = pd.to_datetime(earnings_date)
+        elif hasattr(earnings_date, 'date'):
+            pass  # Already datetime
+        else:
+            return False, None, None
+        
+        # Calculate days until earnings
+        today = datetime.now().date()
+        if hasattr(earnings_date, 'date'):
+            earnings_dt = earnings_date.date()
+        else:
+            earnings_dt = earnings_date
+        
+        days_until = (earnings_dt - today).days
+        
+        # Return warning if earnings within threshold
+        if 0 <= days_until <= days_threshold:
+            return True, days_until, earnings_dt.strftime('%Y-%m-%d')
+        
+        return False, days_until, earnings_dt.strftime('%Y-%m-%d')
+        
+    except Exception:
+        return False, None, None
+
+
+# ──────────────────────────────────────────────────────────────────
+#  SECTOR HEATMAP — Show which sectors are hot/cold today
+# ──────────────────────────────────────────────────────────────────
+@st.cache_data(ttl=300)
+def get_sector_performance():
+    """
+    Calculate today's performance for each sector.
+    Returns dict with sector performance and ranking.
+    """
+    sector_tickers = {
+        'Tech': ['AAPL', 'MSFT', 'GOOGL'],
+        'Semis': ['NVDA', 'AMD', 'AVGO'],
+        'Finance': ['JPM', 'BAC', 'GS'],
+        'Health': ['LLY', 'UNH', 'JNJ'],
+        'Energy': ['XOM', 'CVX', 'SLB'],
+        'Retail': ['WMT', 'COST', 'HD'],
+        'EV': ['TSLA', 'RIVN', 'LCID'],
+        'Media': ['DIS', 'NFLX', 'CMCSA'],
+        'Industrial': ['BA', 'CAT', 'DE'],
+        'Crypto': ['MARA', 'RIOT', 'COIN'],
+    }
+    
+    results = {}
+    
+    for sector, tickers in sector_tickers.items():
+        changes = []
+        for ticker in tickers:
+            try:
+                t = yf.Ticker(ticker)
+                hist = t.history(period='5d', interval='1d')
+                if len(hist) >= 2:
+                    chg = (hist['Close'].iloc[-1] - hist['Close'].iloc[-2]) / hist['Close'].iloc[-2] * 100
+                    changes.append(chg)
+            except:
+                pass
+        
+        if changes:
+            avg_chg = sum(changes) / len(changes)
+            results[sector] = {
+                'change': avg_chg,
+                'direction': 'up' if avg_chg > 0 else 'down',
+                'strength': abs(avg_chg),
+            }
+    
+    # Sort by change (best first)
+    sorted_sectors = sorted(results.items(), key=lambda x: x[1]['change'], reverse=True)
+    
+    for i, (sector, data) in enumerate(sorted_sectors):
+        results[sector]['rank'] = i + 1
+    
+    return results
+
+
+# ──────────────────────────────────────────────────────────────────
 #  MARKET REGIME DETECTION — Check SPY before trading
 # ──────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
@@ -847,11 +955,14 @@ def calc_position(ind, capital):
     }
 
 
-def analyze_ticker(ticker, capital):
+def analyze_ticker(ticker, capital, skip_earnings=True):
     """Analyze a single ticker with advanced scoring."""
     ind, df, news = fetch_data(ticker)
     if ind is None:
         return None
+    
+    # Check for upcoming earnings (skip if within 5 days)
+    has_earnings, days_until, earnings_date = check_earnings(ticker, days_threshold=5)
     
     ns = news_score(news)
     win_prob, reasons = calculate_win_probability(ind, ns)
@@ -871,6 +982,10 @@ def analyze_ticker(ticker, capital):
     if ind["rsi"] > 75:  # Too overbought
         return None
     
+    # Skip if earnings soon (gambling, not trading)
+    if skip_earnings and has_earnings:
+        return None
+    
     return {
         "ticker": ticker,
         "ind": ind,
@@ -879,6 +994,9 @@ def analyze_ticker(ticker, capital):
         "reasons": reasons,
         "pos": pos,
         "ns": ns,
+        "has_earnings_soon": has_earnings,
+        "earnings_days": days_until,
+        "earnings_date": earnings_date,
     }
 
 # ──────────────────────────────────────────────────────────────────
@@ -1000,6 +1118,8 @@ if "market_regime" not in st.session_state:
     st.session_state["market_regime"] = None
 if "whale_data" not in st.session_state:
     st.session_state["whale_data"] = {}
+if "watchlist" not in st.session_state:
+    st.session_state["watchlist"] = ["AAPL", "NVDA", "TSLA", "AMD", "GOOGL"]  # Default watchlist
 
 # Inject CSS
 st.markdown(CSS, unsafe_allow_html=True)
@@ -1043,7 +1163,7 @@ st.markdown(f"""
 # ═══════════════════════════════════════════════════════════════════
 # TABS ARCHITECTURE
 # ═══════════════════════════════════════════════════════════════════
-tab1, tab2 = st.tabs(["⚡ Elite Scanner", "🐋 Whale Radar"])
+tab1, tab2, tab3, tab4 = st.tabs(["⚡ Elite Scanner", "🐋 Whale Radar", "🔥 Sector Heatmap", "⭐ Watchlist"])
 
 # ═══════════════════════════════════════════════════════════════════
 # TAB 1: ELITE SCANNER (Main scanner with whale badges)
@@ -1336,3 +1456,213 @@ with tab2:
             st.markdown("*No whale activity detected in recent scans. Scan some stocks or use the detector above.*")
     else:
         st.markdown("*Enter a ticker above to scan for institutional activity, or run the Elite Scanner to check the top picks.*")
+
+# ═══════════════════════════════════════════════════════════════════
+# TAB 3: SECTOR HEATMAP
+# ═══════════════════════════════════════════════════════════════════
+with tab3:
+    st.markdown("### 🔥 Sector Heatmap — See Where Money Is Flowing")
+    st.markdown("*Identify hot and cold sectors for better stock selection*")
+    
+    heatmap_btn = st.button("🔄 Refresh Sector Data", key="heatmap_btn")
+    
+    st.markdown("---")
+    
+    if heatmap_btn or True:  # Always show on load
+        with st.spinner("Analyzing sector performance..."):
+            sector_data = get_sector_performance()
+        
+        if sector_data:
+            # Sort sectors by performance
+            sorted_sectors = sorted(sector_data.items(), key=lambda x: x[1]['change'], reverse=True)
+            
+            st.markdown("#### Today's Sector Performance")
+            
+            # Display as cards
+            for sector, data in sorted_sectors:
+                chg = data['change']
+                if chg > 1.5:
+                    color = "#00ff88"
+                    emoji = "🔥"
+                    status = "HOT"
+                elif chg > 0:
+                    color = "#4ade80"
+                    emoji = "📈"
+                    status = "UP"
+                elif chg > -1.5:
+                    color = "#f59e0b"
+                    emoji = "📉"
+                    status = "DOWN"
+                else:
+                    color = "#f85149"
+                    emoji = "❄️"
+                    status = "COLD"
+                
+                st.markdown(f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; 
+                            background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+                            border-left: 4px solid {color}; padding: 12px 16px; margin: 8px 0; border-radius: 0 8px 8px 0;">
+                    <div>
+                        <span style="font-size: 1.2em; font-weight: bold; color: #fff;">{emoji} {sector}</span>
+                        <span style="color: {color}; font-weight: bold; margin-left: 12px;">{status}</span>
+                    </div>
+                    <div style="font-size: 1.3em; font-weight: bold; color: {color};">{chg:+.2f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            st.markdown("""
+            <div style="background:#1a2332;border-radius:8px;padding:1rem;margin-top:1rem;">
+                <b style="color:#00ff88;">💡 How to use this:</b><br>
+                <span style="color:#9ca3af;font-size:0.9rem;">
+                • Focus on <b style="color:#00ff88;">HOT</b> sectors for swing trades — momentum is your friend<br>
+                • Avoid <b style="color:#f85149;">COLD</b> sectors — fighting the trend is risky<br>
+                • Sector rotation often leads price — hot sectors today may cool tomorrow
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.warning("Unable to fetch sector data. Please try again.")
+
+# ═══════════════════════════════════════════════════════════════════
+# TAB 4: WATCHLIST
+# ═══════════════════════════════════════════════════════════════════
+with tab4:
+    st.markdown("### ⭐ Your Watchlist — Track Your Favorite Stocks")
+    st.markdown("*Add stocks you want to monitor and scan only your picks*")
+    
+    # Add ticker to watchlist
+    col_add, col_btn = st.columns([3, 1])
+    with col_add:
+        new_ticker = st.text_input(
+            "Add ticker",
+            placeholder="Enter ticker (e.g. AAPL)",
+            label_visibility="collapsed",
+            key="watchlist_add"
+        ).upper().strip()
+    with col_btn:
+        add_btn = st.button("➕ Add", use_container_width=True, key="watchlist_add_btn")
+    
+    if add_btn and new_ticker:
+        if new_ticker not in st.session_state["watchlist"]:
+            if len(st.session_state["watchlist"]) < 20:
+                st.session_state["watchlist"].append(new_ticker)
+                st.success(f"Added {new_ticker} to watchlist!")
+            else:
+                st.warning("Watchlist is full (max 20). Remove some stocks first.")
+        else:
+            st.info(f"{new_ticker} is already in your watchlist.")
+    
+    st.markdown("---")
+    
+    # Show current watchlist
+    st.markdown(f"**Your Watchlist ({len(st.session_state['watchlist'])} stocks):**")
+    
+    if st.session_state["watchlist"]:
+        # Display as removable tags
+        cols = st.columns(5)
+        for i, ticker in enumerate(st.session_state["watchlist"]):
+            with cols[i % 5]:
+                if st.button(f"❌ {ticker}", key=f"remove_{ticker}"):
+                    st.session_state["watchlist"].remove(ticker)
+                    st.rerun()
+        
+        st.markdown("---")
+        
+        # Scan watchlist button
+        capital = st.session_state.get("capital", 10000.0)
+        scan_watchlist_btn = st.button("⚡ Scan Watchlist Only", type="primary", key="scan_watchlist_btn")
+        
+        if scan_watchlist_btn:
+            with st.spinner(f"Scanning {len(st.session_state['watchlist'])} stocks..."):
+                watchlist_results = []
+                progress = st.progress(0)
+                
+                for i, ticker in enumerate(st.session_state["watchlist"]):
+                    result = analyze_ticker(ticker, capital, skip_earnings=False)
+                    
+                    # Also get price even if doesn't meet criteria
+                    if result is None:
+                        ind, df, news = fetch_data(ticker)
+                        if ind:
+                            has_earnings, days_until, earnings_date = check_earnings(ticker)
+                            ns = news_score(news)
+                            win_prob, reasons = calculate_win_probability(ind, ns)
+                            pos = calc_position(ind, capital)
+                            watchlist_results.append({
+                                "ticker": ticker,
+                                "price": ind['price'],
+                                "chg_1d": ind['chg_1d'],
+                                "rsi": ind['rsi'],
+                                "win_prob": win_prob,
+                                "meets_criteria": False,
+                                "has_earnings": has_earnings,
+                                "earnings_days": days_until,
+                            })
+                    else:
+                        has_earnings, days_until, earnings_date = check_earnings(ticker)
+                        watchlist_results.append({
+                            "ticker": ticker,
+                            "price": result['ind']['price'],
+                            "chg_1d": result['ind']['chg_1d'],
+                            "rsi": result['ind']['rsi'],
+                            "win_prob": result['win_prob'],
+                            "meets_criteria": True,
+                            "has_earnings": has_earnings,
+                            "earnings_days": days_until,
+                        })
+                    
+                    progress.progress((i + 1) / len(st.session_state["watchlist"]))
+                
+                progress.empty()
+            
+            # Display results
+            st.markdown("### 📊 Watchlist Analysis")
+            
+            # Stocks that meet criteria (tradeable)
+            tradeable = [r for r in watchlist_results if r['meets_criteria']]
+            if tradeable:
+                st.success(f"**{len(tradeable)} stocks meet trading criteria:**")
+                for r in tradeable:
+                    earnings_warning = f" ⚠️ Earnings in {r['earnings_days']} days!" if r.get('has_earnings') else ""
+                    chg_color = "#00ff88" if r['chg_1d'] >= 0 else "#f85149"
+                    st.markdown(f"""
+                    <div style="background:#1a3d2e;border:1px solid #238636;border-radius:8px;padding:12px;margin:8px 0;">
+                        <span style="font-size:1.2em;font-weight:bold;color:#00ff88;">✅ {r['ticker']}</span>
+                        <span style="margin-left:12px;color:#8b949e;">${r['price']:.2f}</span>
+                        <span style="margin-left:8px;color:{chg_color};">{r['chg_1d']:+.1f}%</span>
+                        <span style="margin-left:12px;color:#00ff88;">{r['win_prob']:.0f}% prob</span>
+                        <span style="color:#f59e0b;">{earnings_warning}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            # Stocks that don't meet criteria
+            not_tradeable = [r for r in watchlist_results if not r['meets_criteria']]
+            if not_tradeable:
+                st.markdown(f"**{len(not_tradeable)} stocks don't meet criteria (watching):**")
+                for r in not_tradeable:
+                    earnings_warning = f" ⚠️ Earnings in {r['earnings_days']} days!" if r.get('has_earnings') else ""
+                    chg_color = "#00ff88" if r['chg_1d'] >= 0 else "#f85149"
+                    st.markdown(f"""
+                    <div style="background:#21262d;border:1px solid #30363d;border-radius:8px;padding:12px;margin:8px 0;">
+                        <span style="font-size:1.1em;font-weight:bold;color:#8b949e;">⏳ {r['ticker']}</span>
+                        <span style="margin-left:12px;color:#8b949e;">${r['price']:.2f}</span>
+                        <span style="margin-left:8px;color:{chg_color};">{r['chg_1d']:+.1f}%</span>
+                        <span style="margin-left:12px;color:#6b7280;">{r['win_prob']:.0f}% prob</span>
+                        <span style="color:#f59e0b;">{earnings_warning}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+    else:
+        st.info("Your watchlist is empty. Add some tickers above!")
+    
+    st.markdown("---")
+    st.markdown("""
+    <div style="background:#1a2332;border-radius:8px;padding:1rem;">
+        <b style="color:#00ff88;">💡 Watchlist Tips:</b><br>
+        <span style="color:#9ca3af;font-size:0.9rem;">
+        • Add stocks you're interested in but don't meet criteria yet<br>
+        • ⚠️ Earnings warnings help you avoid gambling before reports<br>
+        • Green ✅ = Ready to trade · Gray ⏳ = Keep watching
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
