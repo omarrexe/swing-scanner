@@ -470,6 +470,150 @@ def get_sector_performance():
 
 
 # ──────────────────────────────────────────────────────────────────
+#  MULTI-TIMEFRAME ANALYSIS — Weekly trend must confirm daily
+# ──────────────────────────────────────────────────────────────────
+@st.cache_data(ttl=3600)  # Cache for 1 hour (weekly data doesn't change fast)
+def check_weekly_trend(ticker: str):
+    """
+    Check if the WEEKLY trend is bullish.
+    For swing trading, we ONLY want to trade stocks where:
+    - Weekly trend is UP (EMA alignment)
+    - Weekly RSI is healthy (not overbought)
+    - Weekly MACD is positive or turning up
+    
+    Returns: (is_weekly_bullish: bool, weekly_score: int, reasons: list)
+    """
+    try:
+        t = yf.Ticker(ticker)
+        df = t.history(period="2y", interval="1wk", auto_adjust=True)
+        
+        if df.empty or len(df) < 30:
+            return True, 0, []  # Can't check, allow it
+        
+        df.columns = [c.lower() for c in df.columns]
+        c = df["close"]
+        price = float(c.iloc[-1])
+        
+        # Weekly EMAs
+        ema10 = c.ewm(span=10).mean()
+        ema20 = c.ewm(span=20).mean()
+        ema40 = c.ewm(span=40).mean()  # ~200 day equivalent
+        
+        # Weekly RSI
+        delta = c.diff()
+        gain = delta.clip(lower=0).rolling(14).mean()
+        loss = (-delta.clip(upper=0)).rolling(14).mean()
+        rsi = 100 - (100 / (1 + gain / loss))
+        rsi_val = float(rsi.iloc[-1])
+        
+        # Weekly MACD
+        ema12 = c.ewm(span=12).mean()
+        ema26 = c.ewm(span=26).mean()
+        macd = ema12 - ema26
+        signal = macd.ewm(span=9).mean()
+        macd_hist = float((macd - signal).iloc[-1])
+        
+        # Scoring
+        score = 0
+        reasons = []
+        
+        # Weekly EMA alignment (most important)
+        if price > ema10.iloc[-1] > ema20.iloc[-1]:
+            score += 40
+            reasons.append("Weekly EMAs bullish")
+        elif price > ema20.iloc[-1]:
+            score += 20
+            reasons.append("Price above weekly EMA20")
+        else:
+            score -= 30
+            reasons.append("Weekly trend DOWN")
+        
+        # Price above long-term trend
+        if price > ema40.iloc[-1]:
+            score += 20
+            reasons.append("Above 40-week MA (long-term bullish)")
+        else:
+            score -= 20
+            reasons.append("Below 40-week MA (caution)")
+        
+        # Weekly RSI
+        if 40 <= rsi_val <= 70:
+            score += 20
+            reasons.append(f"Weekly RSI healthy ({rsi_val:.0f})")
+        elif rsi_val > 75:
+            score -= 10
+            reasons.append(f"Weekly RSI overbought ({rsi_val:.0f})")
+        elif rsi_val < 35:
+            score -= 20
+            reasons.append(f"Weekly RSI oversold ({rsi_val:.0f})")
+        
+        # Weekly MACD
+        if macd_hist > 0:
+            score += 20
+            reasons.append("Weekly MACD positive")
+        else:
+            score -= 10
+        
+        # Determine if weekly is bullish enough
+        is_bullish = score >= 40
+        
+        return is_bullish, score, reasons
+        
+    except Exception:
+        return True, 0, []  # Can't check, allow it
+
+
+# ──────────────────────────────────────────────────────────────────
+#  SIGNAL PERSISTENCE — Setup must be valid for multiple days
+# ──────────────────────────────────────────────────────────────────
+@st.cache_data(ttl=3600)
+def check_signal_persistence(ticker: str, days: int = 2):
+    """
+    Check if the bullish setup has been valid for X days.
+    This prevents "flash" signals that appear and disappear quickly.
+    
+    A persistent signal = more reliable for swing trading.
+    
+    Returns: (is_persistent: bool, days_valid: int)
+    """
+    try:
+        t = yf.Ticker(ticker)
+        df = t.history(period="1mo", interval="1d", auto_adjust=True)
+        
+        if df.empty or len(df) < 10:
+            return True, 0  # Can't check, allow it
+        
+        df.columns = [c.lower() for c in df.columns]
+        c = df["close"]
+        
+        # Calculate EMAs for all recent days
+        ema8 = c.ewm(span=8).mean()
+        ema21 = c.ewm(span=21).mean()
+        ema50 = c.ewm(span=50).mean()
+        
+        # Check how many consecutive days the setup was valid
+        valid_days = 0
+        for i in range(-1, -min(10, len(df)), -1):
+            price = c.iloc[i]
+            e8 = ema8.iloc[i]
+            e21 = ema21.iloc[i]
+            e50 = ema50.iloc[i]
+            
+            # Basic bullish condition: price > EMA8 > EMA21, price > EMA50
+            if price > e8 > e21 and price > e50:
+                valid_days += 1
+            else:
+                break
+        
+        is_persistent = valid_days >= days
+        
+        return is_persistent, valid_days
+        
+    except Exception:
+        return True, 0  # Can't check, allow it
+
+
+# ──────────────────────────────────────────────────────────────────
 #  MARKET REGIME DETECTION — Check SPY before trading
 # ──────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
@@ -955,8 +1099,14 @@ def calc_position(ind, capital):
     }
 
 
-def analyze_ticker(ticker, capital, skip_earnings=True):
-    """Analyze a single ticker with advanced scoring."""
+def analyze_ticker(ticker, capital, skip_earnings=True, require_weekly=True, require_persistence=True):
+    """
+    Analyze a single ticker with advanced scoring.
+    
+    NEW: Multi-timeframe and signal persistence checks for swing trading.
+    - Weekly trend must be bullish (not just daily)
+    - Signal must have been valid for 2+ days (not a flash signal)
+    """
     ind, df, news = fetch_data(ticker)
     if ind is None:
         return None
@@ -964,9 +1114,36 @@ def analyze_ticker(ticker, capital, skip_earnings=True):
     # Check for upcoming earnings (skip if within 5 days)
     has_earnings, days_until, earnings_date = check_earnings(ticker, days_threshold=5)
     
+    # ═══════════════════════════════════════════════════════════════
+    # NEW: MULTI-TIMEFRAME CHECK — Weekly trend must be bullish
+    # ═══════════════════════════════════════════════════════════════
+    weekly_bullish, weekly_score, weekly_reasons = check_weekly_trend(ticker)
+    if require_weekly and not weekly_bullish:
+        return None  # Skip if weekly trend is not bullish
+    
+    # ═══════════════════════════════════════════════════════════════
+    # NEW: SIGNAL PERSISTENCE — Setup must be valid for 2+ days
+    # ═══════════════════════════════════════════════════════════════
+    is_persistent, days_valid = check_signal_persistence(ticker, days=2)
+    if require_persistence and not is_persistent:
+        return None  # Skip flash signals
+    
     ns = news_score(news)
     win_prob, reasons = calculate_win_probability(ind, ns)
     pos = calc_position(ind, capital)
+    
+    # ═══════════════════════════════════════════════════════════════
+    # BOOST WIN PROBABILITY for multi-timeframe confirmation
+    # ═══════════════════════════════════════════════════════════════
+    mtf_bonus = 0
+    if weekly_bullish and weekly_score >= 60:
+        mtf_bonus += 5  # Strong weekly = +5%
+        reasons.append(("📅 Weekly Trend Confirmed", f"Weekly analysis score: {weekly_score}/100. Multi-timeframe alignment increases win probability."))
+    if is_persistent and days_valid >= 3:
+        mtf_bonus += 3  # 3+ days persistent = +3%
+        reasons.append(("🔒 Persistent Setup", f"This setup has been valid for {days_valid} consecutive days. Not a flash signal."))
+    
+    win_prob = min(95, win_prob + mtf_bonus)
     
     # Filter criteria - only return if meets all requirements
     if win_prob < CFG["min_win_prob"]:
@@ -997,6 +1174,9 @@ def analyze_ticker(ticker, capital, skip_earnings=True):
         "has_earnings_soon": has_earnings,
         "earnings_days": days_until,
         "earnings_date": earnings_date,
+        "weekly_score": weekly_score,
+        "weekly_bullish": weekly_bullish,
+        "days_persistent": days_valid,
     }
 
 # ──────────────────────────────────────────────────────────────────
@@ -1263,15 +1443,26 @@ with tab1:
             st.markdown("""
             <div class="no-picks">
                 🔍 <b>No high-probability setups found right now.</b><br><br>
-                <span style="font-size:0.9rem;">The market may not have any stocks meeting our strict 65%+ win probability criteria.<br>
-                This is actually a good sign — it means we're being selective and protecting your capital.<br>
-                Check back later or search for a specific ticker.</span>
+                <span style="font-size:0.9rem;">The market may not have any stocks meeting our strict criteria:<br>
+                ✓ 65%+ win probability<br>
+                ✓ Weekly trend must be bullish<br>
+                ✓ Setup must be valid for 2+ days (not a flash signal)<br><br>
+                This is actually a good sign — it means we're being selective and protecting your capital.</span>
             </div>
             """, unsafe_allow_html=True)
         else:
-            # Header with diversification note
+            # Header with swing trading note
             st.markdown(f"### 🏆 TOP {len(results)} HIGH-PROBABILITY PICKS")
-            st.markdown(f"*Diversified by sector · Scanned {len(ALL_TICKERS)} stocks · Smart Money detection enabled*")
+            st.markdown(f"*Swing Trading Mode · Multi-Timeframe Confirmed · Hold for 2-10 days*")
+            
+            # Info about signal stability
+            st.markdown("""
+            <div style="background:#1a2332;border:1px solid #238636;border-radius:8px;padding:10px 14px;margin:8px 0 16px 0;font-size:0.85rem;">
+                <span style="color:#00ff88;">🔒 <b>SWING TRADING MODE:</b></span> 
+                <span style="color:#9ca3af;">These picks have <b>weekly trend confirmation</b> and have been valid for <b>2+ days</b>. 
+                They won't change every few hours — designed to hold for 2-10 days.</span>
+            </div>
+            """, unsafe_allow_html=True)
             
             # Display picks with rank
             rank_labels = ["🥇", "🥈", "🥉"]
@@ -1285,6 +1476,8 @@ with tab1:
                 sector = r.get("sector", "Unknown")
                 whale = r.get("whale", {})
                 has_whale = whale.get("has_whale_activity", False)
+                days_persistent = r.get("days_persistent", 0)
+                weekly_score = r.get("weekly_score", 0)
                 
                 rank_label = rank_labels[i] if i < 3 else f"#{i+1}"
                 rank_class = rank_classes[i] if i < 3 else ""
@@ -1292,6 +1485,9 @@ with tab1:
                 # Supertrend indicator badge
                 st_badge = "🟢 ST" if ind.get("supertrend_bull", False) else "🔴 ST"
                 whale_badge_html = '<span class="whale-badge">🐋 WHALE</span>' if has_whale else ""
+                
+                # NEW: Persistence badge
+                persist_badge = f'<span style="background:#1a3d2e;border:1px solid #238636;color:#00ff88;padding:2px 6px;border-radius:4px;font-size:0.7rem;margin-left:4px;">🔒 {days_persistent}d stable</span>' if days_persistent >= 2 else ""
                 
                 # Build the card HTML as a single string
                 card_html = f'''<div class="pick-card {rank_class}">
@@ -1303,6 +1499,7 @@ with tab1:
 <span style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:0.75rem;color:#8b949e;margin-left:8px;">{sector}</span>
 <span style="font-size:0.75rem;margin-left:4px;">{st_badge}</span>
 {whale_badge_html}
+{persist_badge}
 </div>
 <div style="text-align:right;">
 <div class="win-prob">{win_prob:.0f}%</div>

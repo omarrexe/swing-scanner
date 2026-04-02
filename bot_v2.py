@@ -292,6 +292,64 @@ def get_market_regime() -> str:
 
 
 # ══════════════════════════════════════════════════════════════════
+# MULTI-TIMEFRAME CHECK — Weekly trend must be bullish
+# ══════════════════════════════════════════════════════════════════
+def check_weekly_trend(ticker: str) -> bool:
+    """Check if weekly trend is bullish for swing trading."""
+    import yfinance as yf
+    
+    try:
+        t = yf.Ticker(ticker)
+        df = t.history(period="1y", interval="1wk", auto_adjust=True)
+        
+        if df.empty or len(df) < 20:
+            return True  # Can't check, allow it
+        
+        c = df["Close"]
+        price = float(c.iloc[-1])
+        
+        ema10 = c.ewm(span=10).mean().iloc[-1]
+        ema20 = c.ewm(span=20).mean().iloc[-1]
+        
+        # Weekly must be bullish: price > EMA10 > EMA20
+        return price > ema10 and ema10 > ema20
+    except:
+        return True
+
+
+# ══════════════════════════════════════════════════════════════════
+# SIGNAL PERSISTENCE — Setup must be valid for 2+ days
+# ══════════════════════════════════════════════════════════════════
+def check_signal_persistence(ticker: str) -> int:
+    """Check how many consecutive days the setup has been valid."""
+    import yfinance as yf
+    
+    try:
+        t = yf.Ticker(ticker)
+        df = t.history(period="1mo", interval="1d", auto_adjust=True)
+        
+        if df.empty or len(df) < 10:
+            return 0
+        
+        c = df["Close"]
+        ema8 = c.ewm(span=8).mean()
+        ema21 = c.ewm(span=21).mean()
+        ema50 = c.ewm(span=50).mean()
+        
+        valid_days = 0
+        for i in range(-1, -min(10, len(df)), -1):
+            price = c.iloc[i]
+            if price > ema8.iloc[i] > ema21.iloc[i] and price > ema50.iloc[i]:
+                valid_days += 1
+            else:
+                break
+        
+        return valid_days
+    except:
+        return 0
+
+
+# ══════════════════════════════════════════════════════════════════
 # STOCK SCANNER (10-Factor Win Probability)
 # ══════════════════════════════════════════════════════════════════
 def analyze_stock(ticker: str) -> dict:
@@ -439,8 +497,30 @@ def analyze_stock(ticker: str) -> dict:
             score += 5
             reasons.append(f"+{chg_5d:.1f}% this week")
         
+        # ══════════════════════════════════════════════════════════
+        # MULTI-TIMEFRAME & PERSISTENCE CHECKS (NEW!)
+        # ══════════════════════════════════════════════════════════
+        
+        # Check weekly trend
+        weekly_bullish = check_weekly_trend(ticker)
+        if not weekly_bullish:
+            return None  # Skip if weekly trend is not bullish
+        
+        # Check signal persistence (must be valid for 2+ days)
+        days_persistent = check_signal_persistence(ticker)
+        if days_persistent < 2:
+            return None  # Skip flash signals
+        
+        # Bonus for strong multi-timeframe confirmation
+        if weekly_bullish:
+            score += 10
+            reasons.append("Weekly trend confirmed")
+        if days_persistent >= 3:
+            score += 5
+            reasons.append(f"{days_persistent}d stable setup")
+        
         # Calculate win probability
-        win_prob = min(95, int(score / 120 * 100))
+        win_prob = min(95, int(score / 135 * 100))  # Adjusted for bonus points
         
         # ══════════════════════════════════════════════════════════
         # TRADE LEVELS
