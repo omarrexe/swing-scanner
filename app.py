@@ -18,36 +18,516 @@ warnings.filterwarnings('ignore')
 #  PAGE CONFIG
 # ══════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="Sniper Mode",
-    page_icon="◎",
+    page_title="TradingPro • Elite Scanner",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ══════════════════════════════════════════════════════════════════
-#  GEN Z AESTHETIC CSS — Mesh Gradient + Glassmorphism
+#  PREMIUM SAAS UI — ULTRA PROFESSIONAL TRADING PLATFORM
 # ══════════════════════════════════════════════════════════════════
 CSS = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    /* Import Professional Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+    @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
     
-    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-    
-    /* Animated mesh gradient background */
-    .stApp {
-        background: #0a0a0f;
-        background-image: 
-            radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.12) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.1) 0px, transparent 50%),
-            radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.12) 0px, transparent 50%);
-        min-height: 100vh;
+    /* CSS Variables for Premium Theme */
+    :root {
+        --bg-primary: #0B0E14;
+        --bg-secondary: #151822;
+        --bg-tertiary: #1F2937;
+        --bg-card: rgba(31, 41, 55, 0.6);
+        --bg-glass: rgba(255, 255, 255, 0.02);
+        
+        --text-primary: #F8FAFC;
+        --text-secondary: #CBD5E1;
+        --text-muted: #64748B;
+        
+        --accent-primary: #00FF87;
+        --accent-danger: #FF3B30;
+        --accent-warning: #FFD60A;
+        --accent-purple: #8B5CF6;
+        --accent-cyan: #06B6D4;
+        
+        --border-glass: rgba(255, 255, 255, 0.08);
+        --shadow-glow: 0 0 30px rgba(139, 92, 246, 0.15);
+        --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+        
+        --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+        --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     
-    /* Floating orbs animation */
+    /* Global Reset & Base Styles */
+    * { 
+        font-family: var(--font-sans);
+        box-sizing: border-box;
+    }
+    
+    /* Premium Background */
+    .stApp {
+        background: var(--bg-primary);
+        background-image: 
+            radial-gradient(circle at 20% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(6, 182, 212, 0.06) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(0, 255, 135, 0.04) 0%, transparent 50%);
+        min-height: 100vh;
+        position: relative;
+    }
+    
+    /* Animated Background Particles */
     .stApp::before {
         content: '';
         position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: 
+            radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.1) 0%, transparent 25%),
+            radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.08) 0%, transparent 25%);
+        animation: float 20s ease-in-out infinite;
+        pointer-events: none;
+        z-index: -1;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translate(0, 0) rotate(0deg); }
+        33% { transform: translate(30px, -30px) rotate(1deg); }
+        66% { transform: translate(-20px, 20px) rotate(-1deg); }
+    }
+    
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    /* Container Layout */
+    .main .block-container { 
+        max-width: 1200px;
+        padding: 2rem;
+        animation: fadeIn 0.6s ease-out;
+    }
+    
+    /* Hide Streamlit Elements */
+    #MainMenu, footer, header, .stDeployButton { visibility: hidden; }
+    
+    /* Premium Header */
+    .trading-header {
+        text-align: center;
+        padding: 3rem 0;
+        animation: slideUp 0.8s ease-out;
+    }
+    
+    .brand-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-purple) 50%, var(--accent-cyan) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.02em;
+        margin: 0;
+    }
+    
+    .brand-subtitle {
+        font-size: 1.1rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        margin-top: 0.5rem;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Premium Market Status */
+    .market-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 24px;
+        background: var(--bg-glass);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border-glass);
+        border-radius: 50px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin: 2rem auto;
+        transition: all 0.3s ease;
+    }
+    
+    .market-status:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-glow);
+    }
+    
+    .status-bullish { 
+        color: var(--accent-primary);
+        border-color: rgba(0, 255, 135, 0.2);
+    }
+    .status-neutral { 
+        color: var(--accent-warning);
+        border-color: rgba(255, 214, 10, 0.2);
+    }
+    .status-bearish { 
+        color: var(--accent-danger);
+        border-color: rgba(255, 59, 48, 0.2);
+    }
+    
+    /* Premium Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);
+        color: var(--text-primary);
+        border: none;
+        border-radius: 16px;
+        font-family: var(--font-sans);
+        font-weight: 700;
+        font-size: 1.1rem;
+        padding: 1.2rem 2.5rem;
+        width: 100%;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stButton > button::before {
+        content: '';
+        position: absolute;
+        top: 0; left: -100%; right: 0; bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        transition: left 0.6s;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 40px rgba(139, 92, 246, 0.4);
+    }
+    
+    .stButton > button:hover::before {
+        left: 100%;
+    }
+    
+    /* Premium Signal Cards */
+    .signal-card {
+        background: var(--bg-card);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border-glass);
+        border-radius: 24px;
+        padding: 2rem;
+        margin: 1.5rem 0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: slideUp 0.6s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .signal-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent-primary), var(--accent-purple), var(--accent-cyan));
+    }
+    
+    .signal-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--shadow-card);
+        border-color: rgba(139, 92, 246, 0.3);
+    }
+    
+    .signal-primary {
+        border: 2px solid var(--accent-primary);
+        box-shadow: 0 0 30px rgba(0, 255, 135, 0.2);
+    }
+    
+    /* Financial Typography */
+    .ticker-display {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin-bottom: 1rem;
+    }
+    
+    .ticker-symbol {
+        font-family: var(--font-mono);
+        font-size: 3.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.02em;
+    }
+    
+    .ticker-price {
+        font-family: var(--font-mono);
+        font-size: 1.8rem;
+        color: var(--text-secondary);
+        font-weight: 600;
+    }
+    
+    .sector-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(139, 92, 246, 0.15);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        color: var(--accent-purple);
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .action-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .badge-primary {
+        background: var(--accent-primary);
+        color: var(--bg-primary);
+    }
+    
+    .badge-secondary {
+        background: var(--bg-tertiary);
+        color: var(--text-muted);
+        border: 1px solid var(--border-glass);
+    }
+    
+    /* Premium Metrics Grid */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+    
+    .metric-card {
+        background: var(--bg-glass);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border-glass);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(139, 92, 246, 0.3);
+        box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1);
+    }
+    
+    .metric-value {
+        font-family: var(--font-mono);
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-label {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .metric-icon {
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.7;
+    }
+    
+    /* Financial Colors */
+    .text-bullish { color: var(--accent-primary) !important; }
+    .text-bearish { color: var(--accent-danger) !important; }
+    .text-neutral { color: var(--accent-warning) !important; }
+    .text-purple { color: var(--accent-purple) !important; }
+    .text-cyan { color: var(--accent-cyan) !important; }
+    
+    /* Premium Capital Input */
+    .capital-section {
+        background: rgba(6, 182, 212, 0.08);
+        border: 1px solid rgba(6, 182, 212, 0.2);
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 2rem 0;
+        backdrop-filter: blur(20px);
+    }
+    
+    .capital-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--accent-cyan);
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Premium Statistics */
+    .stats-container {
+        background: rgba(139, 92, 246, 0.08);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 2rem 0;
+        backdrop-filter: blur(20px);
+    }
+    
+    .stats-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--accent-purple);
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        text-align: center;
+    }
+    
+    /* Professional Reason Items */
+    .reason-item {
+        background: var(--bg-glass);
+        border: 1px solid var(--border-glass);
+        border-radius: 12px;
+        padding: 1.2rem;
+        margin: 0.8rem 0;
+        transition: all 0.3s ease;
+    }
+    
+    .reason-item:hover {
+        transform: translateX(4px);
+        border-color: rgba(139, 92, 246, 0.3);
+    }
+    
+    .reason-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-primary);
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .reason-text {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+    
+    /* Professional Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        animation: fadeIn 0.8s ease-out;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 1.5rem;
+    }
+    
+    .empty-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.8rem;
+    }
+    
+    .empty-text {
+        color: var(--text-secondary);
+        font-size: 1rem;
+        line-height: 1.6;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    
+    /* Premium Dividers */
+    hr {
+        border: none;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--border-glass), transparent);
+        margin: 3rem 0;
+    }
+    
+    /* Input Styling */
+    .stNumberInput input {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--border-glass) !important;
+        border-radius: 12px !important;
+        color: var(--text-primary) !important;
+        font-family: var(--font-mono) !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Expander Styling */
+    .streamlit-expanderHeader {
+        background: var(--bg-glass) !important;
+        border: 1px solid var(--border-glass) !important;
+        border-radius: 12px !important;
+        backdrop-filter: blur(20px) !important;
+    }
+    
+    /* Signal Count Header */
+    .signals-header {
+        text-align: center;
+        margin: 2rem 0;
+        animation: slideUp 0.6s ease-out 0.2s both;
+    }
+    
+    .signals-count {
+        color: var(--accent-primary);
+        font-size: 1.4rem;
+        font-weight: 700;
+        font-family: var(--font-mono);
+    }
+    
+    .signals-subtitle {
+        color: var(--text-muted);
+        margin-left: 12px;
+        font-size: 0.9rem;
+    }
+    
+    /* Risk/Reward Footer */
+    .trade-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-glass);
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        font-family: var(--font-mono);
+    }
+</style>
+"""
         top: 20%;
         left: 10%;
         width: 300px;
@@ -652,17 +1132,17 @@ def calculate_win_probability(ind):
     
     if ind["price"] > ind["ema8"] > ind["ema21"] > ind["ema50"] > ind["ema200"]:
         score += 35
-        reasons.append(("Perfect Trend", "All EMAs aligned bullish"))
+        reasons.append(("<i class='fas fa-chart-line text-bullish'></i> Perfect Trend", "All EMAs aligned bullish"))
     elif ind["price"] > ind["ema8"] > ind["ema21"] > ind["ema50"]:
         score += 25
-        reasons.append(("Strong Trend", "Short & mid EMAs aligned"))
+        reasons.append(("<i class='fas fa-trending-up text-bullish'></i> Strong Trend", "Short & mid EMAs aligned"))
     elif ind["price"] > ind["ema21"] > ind["ema50"]:
         score += 15
-        reasons.append(("Uptrend", "Above key moving averages"))
+        reasons.append(("<i class='fas fa-arrow-up text-bullish'></i> Uptrend", "Above key moving averages"))
     
     if ind["adx"] > 30 and ind["plus_di"] > ind["minus_di"]:
         score += 20
-        reasons.append(("Strong ADX", f"ADX {ind['adx']:.0f} with bullish direction"))
+        reasons.append(("<i class='fas fa-tachometer-alt text-purple'></i> Strong ADX", f"ADX {ind['adx']:.0f} with bullish direction"))
     elif ind["adx"] > 25:
         score += 12
     elif ind["adx"] > 20:
@@ -670,7 +1150,7 @@ def calculate_win_probability(ind):
     
     if 45 <= ind["rsi"] <= 60 and ind["rsi"] > ind["rsi_prev"]:
         score += 20
-        reasons.append(("RSI Rising", f"RSI {ind['rsi']:.0f}, momentum building"))
+        reasons.append(("<i class='fas fa-signal text-cyan'></i> RSI Rising", f"RSI {ind['rsi']:.0f}, momentum building"))
     elif 40 <= ind["rsi"] <= 65:
         score += 12
     elif ind["rsi"] < 70:
@@ -678,13 +1158,13 @@ def calculate_win_probability(ind):
     
     if ind["macd_hist"] > 0 and ind["macd_hist"] > ind["macd_prev"]:
         score += 15
-        reasons.append(("MACD Bullish", "Histogram positive and rising"))
+        reasons.append(("<i class='fas fa-wave-square text-purple'></i> MACD Bullish", "Histogram positive and rising"))
     elif ind["macd_hist"] > 0:
         score += 8
     
     if ind["vol_ratio"] > 1.5:
         score += 15
-        reasons.append(("High Volume", f"{ind['vol_ratio']:.1f}x average volume"))
+        reasons.append(("<i class='fas fa-volume-up text-cyan'></i> High Volume", f"{ind['vol_ratio']:.1f}x average volume"))
     elif ind["vol_ratio"] > 1.2:
         score += 10
     elif ind["vol_ratio"] > 1.0:
@@ -692,17 +1172,17 @@ def calculate_win_probability(ind):
     
     if ind["supertrend_bull"]:
         score += 15
-        reasons.append(("Supertrend", "Confirms upward momentum"))
+        reasons.append(("<i class='fas fa-rocket text-bullish'></i> Supertrend", "Confirms upward momentum"))
     
     if 2 < ind["chg_5d"] < 10:
         score += 15
-        reasons.append(("Momentum", f"+{ind['chg_5d']:.1f}% this week"))
+        reasons.append(("<i class='fas fa-fire text-warning'></i> Momentum", f"+{ind['chg_5d']:.1f}% this week"))
     elif 0 < ind["chg_5d"] < 15:
         score += 8
     
     if ind["rsi"] < 65:
         score += 15
-        reasons.append(("Room to Run", "Not overbought yet"))
+        reasons.append(("<i class='fas fa-arrow-circle-up text-bullish'></i> Room to Run", "Not overbought yet"))
     
     win_prob = min(95, int(score / max_score * 100))
     return win_prob, reasons
@@ -960,30 +1440,93 @@ def make_chart(df, ind, pos):
     
     fig = go.Figure()
     
+    # Premium neon candlesticks
     fig.add_trace(go.Candlestick(
         x=df2.index, open=df2["open"], high=df2["high"],
         low=df2["low"], close=df2["close"],
         name="Price",
-        increasing_line_color="#30d158",
-        decreasing_line_color="#ff453a",
+        increasing_line_color="#00FF87",  # Neon green
+        decreasing_line_color="#FF3B30",  # Neon red
+        increasing_fillcolor="rgba(0, 255, 135, 0.8)",
+        decreasing_fillcolor="rgba(255, 59, 48, 0.8)",
     ))
     
-    fig.add_trace(go.Scatter(x=df2.index, y=ema8, name="EMA 8", line=dict(color="#0a84ff", width=1)))
-    fig.add_trace(go.Scatter(x=df2.index, y=ema21, name="EMA 21", line=dict(color="#ff9f0a", width=1)))
+    # Neon EMA lines
+    fig.add_trace(go.Scatter(
+        x=df2.index, y=ema8, 
+        name="EMA 8", 
+        line=dict(color="#8B5CF6", width=2, dash="dot")  # Purple
+    ))
+    fig.add_trace(go.Scatter(
+        x=df2.index, y=ema21, 
+        name="EMA 21", 
+        line=dict(color="#06B6D4", width=2, dash="dash")  # Cyan
+    ))
     
-    fig.add_hline(y=pos["sl"], line_dash="dash", line_color="#ff453a", annotation_text="Stop")
-    fig.add_hline(y=pos["tp"], line_dash="dash", line_color="#30d158", annotation_text="Target")
+    # Professional stop/target lines
+    fig.add_hline(
+        y=pos["sl"], 
+        line_dash="dash", 
+        line_color="#FF3B30", 
+        line_width=2,
+        annotation_text="Stop Loss",
+        annotation_font_color="#FF3B30"
+    )
+    fig.add_hline(
+        y=pos["tp"], 
+        line_dash="dash", 
+        line_color="#00FF87", 
+        line_width=2,
+        annotation_text="Target",
+        annotation_font_color="#00FF87"
+    )
     
+    # Premium dark theme layout
     fig.update_layout(
-        paper_bgcolor="#1c1c1e",
-        plot_bgcolor="#1c1c1e",
-        font=dict(color="#86868b", size=10),
-        xaxis=dict(gridcolor="#2c2c2e", showgrid=True),
-        yaxis=dict(gridcolor="#2c2c2e", showgrid=True, side="right"),
+        paper_bgcolor="rgba(0,0,0,0)",  # Transparent to match cards
+        plot_bgcolor="rgba(11, 14, 20, 0.95)",  # Match --bg-primary with slight opacity
+        font=dict(
+            family="'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            color="#CBD5E1",  # --text-secondary
+            size=11
+        ),
+        # Remove all gridlines for clean look
+        xaxis=dict(
+            gridcolor="rgba(255, 255, 255, 0.05)",
+            showgrid=False,  # Minimal gridlines
+            zeroline=False,
+            linecolor="rgba(255, 255, 255, 0.08)"
+        ),
+        yaxis=dict(
+            gridcolor="rgba(255, 255, 255, 0.05)",
+            showgrid=False,  # Minimal gridlines
+            zeroline=False,
+            side="right",
+            linecolor="rgba(255, 255, 255, 0.08)"
+        ),
         xaxis_rangeslider_visible=False,
-        legend=dict(orientation="h", y=1.1),
-        height=350,
-        margin=dict(l=10, r=50, t=30, b=10),
+        legend=dict(
+            orientation="h", 
+            y=1.02,
+            bgcolor="rgba(0,0,0,0)",
+            bordercolor="rgba(0,0,0,0)",
+            font=dict(color="#CBD5E1")
+        ),
+        height=400,
+        margin=dict(l=0, r=0, t=40, b=0),
+        # Add subtle border to match card styling
+        shapes=[
+            dict(
+                type="rect",
+                xref="paper", yref="paper",
+                x0=0, y0=0, x1=1, y1=1,
+                line=dict(
+                    color="rgba(255, 255, 255, 0.08)",
+                    width=1
+                ),
+                fillcolor="rgba(0,0,0,0)"
+            )
+        ]
     )
     return fig
 
@@ -1003,22 +1546,23 @@ if "show_backtest" not in st.session_state:
 # Inject CSS
 st.markdown(CSS, unsafe_allow_html=True)
 
-# Header
+# Premium Header
 st.markdown("""
-<div class="app-header">
-    <h1 class="app-title">Rotation Mode</h1>
-    <p class="app-subtitle">Take Signals · Rotate Capital · Compound Gains</p>
+<div class="trading-header">
+    <h1 class="brand-title">TradingPro Elite</h1>
+    <p class="brand-subtitle">Professional-Grade Swing Trading Scanner</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Market Status
+# Market Status with Professional Icons
 regime, regime_score, regime_msg = get_market_regime()
-pill_class = f"market-{regime.lower()}"
+status_icon = "fas fa-chart-line" if regime == "BULLISH" else "fas fa-minus" if regime == "NEUTRAL" else "fas fa-chart-line-down"
+status_class = "status-bullish" if regime == "BULLISH" else "status-neutral" if regime == "NEUTRAL" else "status-bearish"
 st.markdown(f"""
 <div style="text-align: center;">
-    <span class="market-pill {pill_class}">
-        <span>●</span> Market: {regime_msg}
-    </span>
+    <div class="market-status {status_class}">
+        <i class="{status_icon}"></i> Market: {regime_msg} ({regime_score}/100)
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1043,12 +1587,21 @@ if scan_btn:
 results = st.session_state.get("sniper_result")
 
 if results and len(results) > 0:
-    # Show count of signals found
+    # Professional signals header with icons
     count_text = f"{len(results)} Signal{'s' if len(results) > 1 else ''} Found"
-    st.markdown(f'<div style="text-align: center; margin: 1rem 0;"><span style="color: #4ade80; font-size: 1.2rem; font-weight: 600;">{count_text}</span><span style="color: #64748b; margin-left: 8px;">Take #1, rotate to next when closed</span></div>', unsafe_allow_html=True)
+    st.markdown(f'''
+    <div class="signals-header">
+        <span class="signals-count"><i class="fas fa-bullseye"></i> {count_text}</span>
+        <span class="signals-subtitle">Take primary pick, rotate to next when position closed</span>
+    </div>
+    ''', unsafe_allow_html=True)
     
-    # Capital input at top
-    st.markdown('<div class="capital-card"><div class="capital-title">💰 Your Capital</div></div>', unsafe_allow_html=True)
+    # Premium capital input section
+    st.markdown('''
+    <div class="capital-section">
+        <div class="capital-title"><i class="fas fa-wallet"></i> Trading Capital</div>
+    </div>
+    ''', unsafe_allow_html=True)
     capital = st.number_input("Enter capital", min_value=100.0, max_value=1000000.0, value=st.session_state["capital"], step=100.0, label_visibility="collapsed")
     st.session_state["capital"] = capital
     
@@ -1061,25 +1614,42 @@ if results and len(results) > 0:
         # Signal number badge
         badge_color = "#4ade80" if i == 0 else "#64748b"
         badge_text = "TAKE NOW" if i == 0 else f"#{i+1} NEXT"
-        card_style = "border: 2px solid #4ade80;" if i == 0 else "opacity: 0.8;"
+        card_class = "signal-card signal-primary" if i == 0 else "signal-card"
         
-        # Build HTML as single line
-        card_html = f'<div class="result-card" style="{card_style}">'
-        card_html += f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">'
-        card_html += f'<div class="ticker-display"><span class="ticker-symbol">{result["ticker"]}</span><span class="ticker-price">${ind["price"]:.2f}</span></div>'
-        card_html += f'<span style="background: {badge_color}; color: #000; padding: 4px 12px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;">{badge_text}</span>'
+        # Sector icon mapping
+        sector_icons = {
+            "Technology": "fas fa-microchip",
+            "Communication": "fas fa-satellite-dish",
+            "Consumer": "fas fa-shopping-cart",
+            "Healthcare": "fas fa-heartbeat",
+            "Financial": "fas fa-university",
+            "Industrial": "fas fa-industry",
+            "Energy": "fas fa-bolt",
+            "Materials": "fas fa-hammer"
+        }
+        sector_icon = sector_icons.get(result["sector"], "fas fa-building")
+        
+        # Build premium HTML card as single line
+        card_html = f'<div class="{card_class}">'
+        card_html += f'<div class="ticker-display">'
+        card_html += f'<span class="ticker-symbol">{result["ticker"]}</span>'
+        card_html += f'<span class="ticker-price">${ind["price"]:.2f}</span>'
+        if i == 0:
+            card_html += f'<span class="action-badge badge-primary"><i class="fas fa-star"></i> PRIMARY PICK</span>'
+        else:
+            card_html += f'<span class="action-badge badge-secondary"><i class="fas fa-clock"></i> ROTATION #{i+1}</span>'
         card_html += '</div>'
-        card_html += f'<span class="ticker-sector">{result["sector"]}</span>'
-        card_html += '<div class="levels-grid" style="margin-top: 1.5rem;">'
-        card_html += f'<div class="level-item"><div class="level-value" style="color: #a78bfa;">{result["win_prob"]}%</div><div class="level-label">Probability</div></div>'
-        card_html += f'<div class="level-item"><div class="level-value red">${pos["sl"]:.2f}</div><div class="level-label">Stop ({pos["sl_pct"]:.1f}%)</div></div>'
-        card_html += f'<div class="level-item"><div class="level-value green">${pos["tp"]:.2f}</div><div class="level-label">Target (+{pos["tp_pct"]:.1f}%)</div></div>'
-        card_html += f'<div class="level-item"><div class="level-value blue">{pos["shares"]:.1f}</div><div class="level-label">Shares</div></div>'
+        card_html += f'<div class="sector-badge"><i class="{sector_icon}"></i> {result["sector"]}</div>'
+        card_html += '<div class="metrics-grid" style="margin-top: 1.5rem;">'
+        card_html += f'<div class="metric-card"><div class="metric-icon"><i class="fas fa-percentage text-purple"></i></div><div class="metric-value text-purple">{result["win_prob"]}%</div><div class="metric-label">Win Probability</div></div>'
+        card_html += f'<div class="metric-card"><div class="metric-icon"><i class="fas fa-shield-alt text-bearish"></i></div><div class="metric-value text-bearish">${pos["sl"]:.2f}</div><div class="metric-label">Stop Loss ({pos["sl_pct"]:.1f}%)</div></div>'
+        card_html += f'<div class="metric-card"><div class="metric-icon"><i class="fas fa-bullseye text-bullish"></i></div><div class="metric-value text-bullish">${pos["tp"]:.2f}</div><div class="metric-label">Target (+{pos["tp_pct"]:.1f}%)</div></div>'
+        card_html += f'<div class="metric-card"><div class="metric-icon"><i class="fas fa-chart-bar text-cyan"></i></div><div class="metric-value text-cyan">{pos["shares"]:.0f}</div><div class="metric-label">Shares</div></div>'
         card_html += '</div>'
-        card_html += f'<div style="display: flex; justify-content: space-between; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); color: #64748b; font-size: 0.85rem;">'
-        card_html += f'<span>Risk: <span style="color: #f87171;">${pos["max_loss"]:.0f}</span></span>'
-        card_html += f'<span>Reward: <span style="color: #4ade80;">${pos["max_gain"]:.0f}</span></span>'
-        card_html += f'<span>R:R <span style="color: #60a5fa;">1:{pos["rr"]:.1f}</span></span>'
+        card_html += f'<div class="trade-footer">'
+        card_html += f'<span><i class="fas fa-arrow-down text-bearish"></i> Risk: <strong class="text-bearish">${pos["max_loss"]:.0f}</strong></span>'
+        card_html += f'<span><i class="fas fa-arrow-up text-bullish"></i> Reward: <strong class="text-bullish">${pos["max_gain"]:.0f}</strong></span>'
+        card_html += f'<span><i class="fas fa-balance-scale text-purple"></i> R:R <strong class="text-purple">1:{pos["rr"]:.1f}</strong></span>'
         card_html += '</div></div>'
         
         st.markdown(card_html, unsafe_allow_html=True)
@@ -1103,22 +1673,22 @@ if results and len(results) > 0:
     monthly_return = expected_per_trade * monthly_trades
     monthly_est = capital * monthly_return / 100
     
-    returns_html = f'<div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 16px; padding: 1.5rem; margin: 1.5rem 0;">'
-    returns_html += '<div style="color: #a78bfa; font-weight: 600; font-size: 0.9rem; margin-bottom: 1rem;">📈 Rotation Strategy (Expected)</div>'
-    returns_html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">'
-    returns_html += f'<div><div style="font-size: 1.3rem; font-weight: 700; color: #fff;">~{monthly_trades}</div><div style="font-size: 0.7rem; color: #64748b;">TRADES/MONTH</div></div>'
-    returns_html += f'<div><div style="font-size: 1.3rem; font-weight: 700; color: #4ade80;">+{expected_per_trade:.1f}%</div><div style="font-size: 0.7rem; color: #64748b;">PER TRADE</div></div>'
-    returns_html += f'<div><div style="font-size: 1.3rem; font-weight: 700; color: #4ade80;">+${monthly_est:.0f}</div><div style="font-size: 0.7rem; color: #64748b;">MONTHLY EST.</div></div>'
+    returns_html = f'<div class="stats-container">'
+    returns_html += '<div class="stats-title"><i class="fas fa-chart-line"></i> Expected Performance</div>'
+    returns_html += '<div class="stats-grid">'
+    returns_html += f'<div><div class="metric-icon"><i class="fas fa-calendar-alt"></i></div><div class="metric-value text-primary">~{monthly_trades}</div><div class="metric-label">TRADES/MONTH</div></div>'
+    returns_html += f'<div><div class="metric-icon"><i class="fas fa-percentage"></i></div><div class="metric-value text-bullish">+{expected_per_trade:.1f}%</div><div class="metric-label">PER TRADE</div></div>'
+    returns_html += f'<div><div class="metric-icon"><i class="fas fa-dollar-sign"></i></div><div class="metric-value text-bullish">+${monthly_est:.0f}</div><div class="metric-label">MONTHLY EST.</div></div>'
     returns_html += '</div>'
-    returns_html += '<div style="color: #64748b; font-size: 0.8rem; margin-top: 1rem; text-align: center;">Based on ~45% win rate · +6.7% avg win · -3.3% avg loss</div>'
+    returns_html += '<div style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1rem; text-align: center;">Based on ~45% win rate · +6.7% avg win · -3.3% avg loss</div>'
     returns_html += '</div>'
     st.markdown(returns_html, unsafe_allow_html=True)
 
 elif scan_btn:
-    st.markdown('<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-title">No Setups Today</div><div class="empty-text">No stocks meet our 60%+ criteria right now. Check back tomorrow.</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="empty-state"><div class="empty-icon"><i class="fas fa-search"></i></div><div class="empty-title">No Setups Found</div><div class="empty-text">Market conditions don\'t meet our 60%+ criteria right now. Try again tomorrow or adjust parameters.</div></div>', unsafe_allow_html=True)
 
 else:
-    ready_html = f'<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-title">Ready to Scan</div><div class="empty-text">Scanning {len(ALL_TICKERS)} stocks for rotation opportunities. 60%+ probability · 2:1 reward/risk</div></div>'
+    ready_html = f'<div class="empty-state"><div class="empty-icon"><i class="fas fa-bullseye"></i></div><div class="empty-title">Ready to Scan</div><div class="empty-text">Scanning {len(ALL_TICKERS)} elite stocks for premium swing opportunities with 60%+ win probability and 2:1 reward/risk ratio</div></div>'
     st.markdown(ready_html, unsafe_allow_html=True)
 
 # Backtest Section
@@ -1138,40 +1708,58 @@ with st.expander("📊 Past Performance (3 Months)"):
         
         if stats["total"] > 0:
             st.markdown(f"""
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-value">{stats['total']}</div>
-                    <div class="stat-label">Signals</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" style="color: #30d158;">{stats['win_rate']:.0f}%</div>
-                    <div class="stat-label">Win Rate</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" style="color: #30d158;">+{stats['avg_win']:.1f}%</div>
-                    <div class="stat-label">Avg Win</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" style="color: #ff453a;">{stats['avg_loss']:.1f}%</div>
-                    <div class="stat-label">Avg Loss</div>
+            <div class="stats-container">
+                <div class="stats-title"><i class="fas fa-history"></i> Backtest Results (3 Months)</div>
+                <div class="stats-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fas fa-bullseye"></i></div>
+                        <div class="metric-value text-primary">{stats['total']}</div>
+                        <div class="metric-label">Total Signals</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fas fa-trophy"></i></div>
+                        <div class="metric-value text-bullish">{stats['win_rate']:.0f}%</div>
+                        <div class="metric-label">Win Rate</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fas fa-arrow-up"></i></div>
+                        <div class="metric-value text-bullish">+{stats['avg_win']:.1f}%</div>
+                        <div class="metric-label">Avg Win</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fas fa-arrow-down"></i></div>
+                        <div class="metric-value text-bearish">{stats['avg_loss']:.1f}%</div>
+                        <div class="metric-label">Avg Loss</div>
+                    </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            st.markdown('<div class="backtest-title">Recent Signals</div>', unsafe_allow_html=True)
+            st.markdown('<div style="margin: 2rem 0; color: var(--text-secondary); font-weight: 600; font-size: 1.1rem;"><i class="fas fa-list"></i> Recent Signals</div>', unsafe_allow_html=True)
             
             for s in sorted(signals, key=lambda x: x["pnl_pct"], reverse=True)[:10]:
-                color = "#30d158" if s["won"] else "#ff453a"
+                result_color = "text-bullish" if s["won"] else "text-bearish"
                 result_text = f"+{s['pnl_pct']:.1f}%" if s["won"] else f"{s['pnl_pct']:.1f}%"
-                outcome = "TP Hit" if s["hit_tp"] else "SL Hit" if s["hit_sl"] else f"{s['days']}d"
+                outcome_icon = "fas fa-bullseye" if s["hit_tp"] else "fas fa-shield-alt" if s["hit_sl"] else "fas fa-clock"
+                outcome_text = "Target Hit" if s["hit_tp"] else "Stop Hit" if s["hit_sl"] else f"{s['days']} Days"
                 
                 st.markdown(f"""
-                <div class="signal-row">
-                    <span class="signal-ticker">{s['ticker']}</span>
-                    <span class="signal-date">{s['date']} · ${s['entry']:.0f} → ${s['exit']:.0f}</span>
-                    <span style="color: #86868b;">{outcome}</span>
-                    <span class="signal-result" style="color: {color};">{result_text}</span>
+                <div class="reason-item">
+                    <div class="reason-title">
+                        <span style="font-family: var(--font-mono); font-weight: 700;">{s['ticker']}</span>
+                        <span class="metric-value {result_color}" style="font-size: 1rem;">{result_text}</span>
+                    </div>
+                    <div class="reason-text">
+                        {s['date']} • Entry: ${s['entry']:.0f} → Exit: ${s['exit']:.0f} • 
+                        <i class="{outcome_icon}"></i> {outcome_text}
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
         else:
-            st.info("No signals found in the past 3 months with current criteria.")
+            st.markdown("""
+            <div class="empty-state">
+                <div class="empty-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="empty-title">No Historical Data</div>
+                <div class="empty-text">No signals found in the past 3 months with current criteria</div>
+            </div>
+            """, unsafe_allow_html=True)
