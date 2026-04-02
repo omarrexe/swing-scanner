@@ -1,6 +1,7 @@
 """
-Swing Trading Scanner — Elite Edition v2
-Advanced algorithms with Market Regime Detection & Sector Diversification.
+Swing Trading Scanner — Elite Edition v3
+Advanced algorithms with Market Regime Detection, Sector Diversification,
+and Smart Money (Whale Radar) Detection.
 Shows only TOP 3 stocks with highest win probability.
 """
 
@@ -12,12 +13,14 @@ import pandas_ta as ta
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import warnings
+warnings.filterwarnings('ignore')
 
 # ──────────────────────────────────────────────────────────────────
 #  PAGE CONFIG
 # ──────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="⚡ Elite Swing Picks",
+    page_title="⚡ Elite Swing Scanner",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -28,7 +31,7 @@ st.set_page_config(
 # ──────────────────────────────────────────────────────────────────
 CSS = """
 <style>
-    .main .block-container { max-width: 1000px; padding: 1rem 2rem; }
+    .main .block-container { max-width: 1100px; padding: 1rem 2rem; }
     
     .header { 
         font-size: 1.8rem; font-weight: 700; color: #00ff88;
@@ -62,6 +65,13 @@ CSS = """
         font-size: 0.7rem; color: #8b949e; margin-left: 0.5rem;
     }
     
+    .whale-badge {
+        background: linear-gradient(135deg, #1a1a4a 0%, #2a2a6a 100%);
+        border: 1px solid #6366f1;
+        color: #a5b4fc; padding: 0.2rem 0.6rem; border-radius: 6px;
+        font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;
+    }
+    
     .win-prob { font-size: 2rem; font-weight: 700; color: #00ff88; }
     .win-label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
     
@@ -72,6 +82,15 @@ CSS = """
     }
     .reason-title { color: #00ff88; font-weight: 600; font-size: 0.9rem; }
     .reason-text { color: #b0b0b0; font-size: 0.85rem; margin-top: 0.3rem; }
+    
+    .whale-box {
+        background: linear-gradient(135deg, #1a1a3a 0%, #1a2a4a 100%);
+        border-left: 3px solid #6366f1;
+        padding: 0.8rem 1rem; margin: 0.8rem 0;
+        border-radius: 0 8px 8px 0;
+    }
+    .whale-title { color: #a5b4fc; font-weight: 600; font-size: 0.9rem; }
+    .whale-text { color: #9ca3af; font-size: 0.85rem; margin-top: 0.3rem; }
     
     .levels {
         display: flex; gap: 1.5rem; margin-top: 0.8rem;
@@ -89,6 +108,20 @@ CSS = """
         background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
         color: white; border: none; border-radius: 8px;
         font-weight: 600; padding: 0.6rem 1.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #161b22;
+        border-radius: 8px 8px 0 0;
+        padding: 10px 20px;
+        color: #8b949e;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #21262d;
+        color: #00ff88;
     }
 </style>
 """
@@ -164,6 +197,169 @@ CFG = {
     "scan_threads"      : 10,
     "max_results"       : 3,
 }
+
+# ══════════════════════════════════════════════════════════════════
+#  🐋 SMART MONEY (WHALE RADAR) DETECTION
+# ══════════════════════════════════════════════════════════════════
+
+@st.cache_data(ttl=600)
+def detect_smart_money(ticker: str):
+    """
+    Detect institutional "Smart Money" activity using FREE yfinance data.
+    
+    Two detection methods:
+    1. Unusual Options Activity (UOA): Vol/OI ratio > 3x indicates sweeps
+    2. Dark Pool Proxy: High volume with tight price spread = absorption
+    
+    Returns: dict with whale signals and explanations
+    """
+    signals = []
+    has_whale_activity = False
+    
+    try:
+        t = yf.Ticker(ticker)
+        
+        # ═══════════════════════════════════════════════════════════
+        # 1. UNUSUAL OPTIONS ACTIVITY (UOA) DETECTION
+        # ═══════════════════════════════════════════════════════════
+        try:
+            # Get options expiration dates
+            exp_dates = t.options
+            if exp_dates and len(exp_dates) > 0:
+                # Get nearest expiration (this week or next)
+                nearest_exp = exp_dates[0]
+                opt_chain = t.option_chain(nearest_exp)
+                calls = opt_chain.calls
+                puts = opt_chain.puts
+                
+                # Calculate Put/Call Ratio
+                total_call_vol = calls['volume'].sum() if 'volume' in calls.columns else 0
+                total_put_vol = puts['volume'].sum() if 'volume' in puts.columns else 0
+                pcr = total_put_vol / total_call_vol if total_call_vol > 0 else 1.0
+                
+                # Find unusual call activity (bullish bets)
+                unusual_calls = []
+                if not calls.empty and 'volume' in calls.columns and 'openInterest' in calls.columns:
+                    calls_filtered = calls[(calls['volume'] > 100) & (calls['openInterest'] > 0)]
+                    for _, row in calls_filtered.iterrows():
+                        vol_oi_ratio = row['volume'] / row['openInterest'] if row['openInterest'] > 0 else 0
+                        if vol_oi_ratio >= 3.0:  # 3x or higher = unusual
+                            unusual_calls.append({
+                                'strike': row['strike'],
+                                'volume': int(row['volume']),
+                                'oi': int(row['openInterest']),
+                                'ratio': vol_oi_ratio,
+                            })
+                
+                # Find unusual put activity (bearish or hedging)
+                unusual_puts = []
+                if not puts.empty and 'volume' in puts.columns and 'openInterest' in puts.columns:
+                    puts_filtered = puts[(puts['volume'] > 100) & (puts['openInterest'] > 0)]
+                    for _, row in puts_filtered.iterrows():
+                        vol_oi_ratio = row['volume'] / row['openInterest'] if row['openInterest'] > 0 else 0
+                        if vol_oi_ratio >= 3.0:
+                            unusual_puts.append({
+                                'strike': row['strike'],
+                                'volume': int(row['volume']),
+                                'oi': int(row['openInterest']),
+                                'ratio': vol_oi_ratio,
+                            })
+                
+                # Sort by ratio (most unusual first)
+                unusual_calls.sort(key=lambda x: x['ratio'], reverse=True)
+                unusual_puts.sort(key=lambda x: x['ratio'], reverse=True)
+                
+                # Report findings
+                if unusual_calls:
+                    top = unusual_calls[0]
+                    has_whale_activity = True
+                    signals.append({
+                        'type': 'UOA_CALL',
+                        'title': '🐋 Unusual CALL Activity Detected',
+                        'text': f"Large call buying at ${top['strike']:.0f} strike — {top['volume']:,} contracts (Vol/OI: {top['ratio']:.1f}x). Institutions may be betting on upside.",
+                        'strength': min(top['ratio'] / 5.0, 1.0),  # Normalize to 0-1
+                    })
+                
+                if unusual_puts and len(unusual_puts) > len(unusual_calls):
+                    top = unusual_puts[0]
+                    signals.append({
+                        'type': 'UOA_PUT',
+                        'title': '⚠️ Unusual PUT Activity Detected',
+                        'text': f"Large put buying at ${top['strike']:.0f} strike — {top['volume']:,} contracts (Vol/OI: {top['ratio']:.1f}x). Could be hedging or bearish bet.",
+                        'strength': min(top['ratio'] / 5.0, 1.0),
+                    })
+                
+                # Put/Call Ratio insight
+                if pcr < 0.5:
+                    signals.append({
+                        'type': 'PCR_BULLISH',
+                        'title': '📊 Bullish Options Sentiment',
+                        'text': f"Put/Call Ratio: {pcr:.2f} — Heavy call buying suggests bullish institutional sentiment.",
+                        'strength': 0.6,
+                    })
+                elif pcr > 1.5:
+                    signals.append({
+                        'type': 'PCR_BEARISH',
+                        'title': '📊 Bearish Options Sentiment',
+                        'text': f"Put/Call Ratio: {pcr:.2f} — Heavy put buying suggests caution.",
+                        'strength': 0.4,
+                    })
+        except Exception:
+            pass  # Options data not available for this ticker
+        
+        # ═══════════════════════════════════════════════════════════
+        # 2. DARK POOL PROXY (Volume Anomaly with Tight Spread)
+        # ═══════════════════════════════════════════════════════════
+        try:
+            df = t.history(period="1mo", interval="1d")
+            if not df.empty and len(df) >= 10:
+                df.columns = [c.lower() for c in df.columns]
+                
+                # Calculate metrics
+                avg_vol = df['volume'].rolling(20).mean()
+                vol_ratio = df['volume'] / avg_vol
+                
+                # Body size as % of price (tight = doji/absorption)
+                body_pct = abs(df['close'] - df['open']) / df['close'] * 100
+                
+                # Find days with high volume but tight body (absorption)
+                recent = df.tail(5)
+                for idx, row in recent.iterrows():
+                    vol_r = row['volume'] / avg_vol.loc[idx] if idx in avg_vol.index else 1
+                    body = abs(row['close'] - row['open']) / row['close'] * 100
+                    
+                    # High volume (4x+) with tight body (<0.5%) = Dark Pool signature
+                    if vol_r >= 4.0 and body < 0.5:
+                        has_whale_activity = True
+                        signals.append({
+                            'type': 'DARK_POOL',
+                            'title': '🏦 Institutional Accumulation Detected',
+                            'text': f"Massive volume ({vol_r:.1f}x average) with minimal price movement. Classic dark pool absorption pattern.",
+                            'strength': 0.8,
+                        })
+                        break  # Only report once
+                    
+                    # Very high volume (3x+) with small body (<1%) = likely institutional
+                    elif vol_r >= 3.0 and body < 1.0:
+                        signals.append({
+                            'type': 'BLOCK_TRADE',
+                            'title': '📦 Large Block Trade Detected',
+                            'text': f"Volume {vol_r:.1f}x average with controlled price action. Possible institutional block trade.",
+                            'strength': 0.5,
+                        })
+                        has_whale_activity = True
+                        break
+        except Exception:
+            pass
+        
+    except Exception:
+        pass
+    
+    return {
+        'has_whale_activity': has_whale_activity,
+        'signals': signals,
+        'signal_count': len(signals),
+    }
 
 # ──────────────────────────────────────────────────────────────────
 #  MARKET REGIME DETECTION — Check SPY before trading
@@ -792,7 +988,7 @@ def make_chart(df, ind, pos):
 
 
 # ──────────────────────────────────────────────────────────────────
-#  MAIN UI
+#  MAIN UI WITH TABS
 # ──────────────────────────────────────────────────────────────────
 
 # Session state init
@@ -802,13 +998,15 @@ if "capital" not in st.session_state:
     st.session_state["capital"] = 10000.0
 if "market_regime" not in st.session_state:
     st.session_state["market_regime"] = None
+if "whale_data" not in st.session_state:
+    st.session_state["whale_data"] = {}
 
 # Inject CSS
 st.markdown(CSS, unsafe_allow_html=True)
 
 # Header
-st.markdown('<div class="header">⚡ ELITE SWING PICKS</div>', unsafe_allow_html=True)
-st.markdown('<div class="subheader">Phase 1: Market Regime + Sector Diversification + Supertrend + pandas-ta</div>', unsafe_allow_html=True)
+st.markdown('<div class="header">⚡ ELITE SWING SCANNER</div>', unsafe_allow_html=True)
+st.markdown('<div class="subheader">Smart Money Detection · Market Regime Analysis · 10-Factor Win Probability</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════
 # MARKET REGIME DISPLAY - Check market condition before scanning
@@ -832,9 +1030,9 @@ else:  # BEARISH
 st.markdown(f"""
 <div style="background: linear-gradient(135deg, #161b22 0%, #0d1117 100%); 
             border: 1px solid {regime_color}40; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-    <div style="display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
         <div>
-            <span style="font-size: 1.1em; font-weight: bold; color: {regime_color};">{regime_icon} MARKET REGIME: {regime}</span>
+            <span style="font-size: 1.1em; font-weight: bold; color: {regime_color};">{regime_icon} MARKET: {regime}</span>
             <span style="color: #8b949e; margin-left: 12px;">(SPY Score: {regime_score}/100)</span>
         </div>
         <div style="color: #8b949e; font-size: 0.9em;">{regime_msg}</div>
@@ -842,182 +1040,311 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Show regime analysis details in expander
-with st.expander("📊 Market Analysis Details"):
-    for reason in regime_reasons:
-        st.markdown(f"• {reason}")
+# ═══════════════════════════════════════════════════════════════════
+# TABS ARCHITECTURE
+# ═══════════════════════════════════════════════════════════════════
+tab1, tab2 = st.tabs(["⚡ Elite Scanner", "🐋 Whale Radar"])
 
-# Controls row
-col_cap, col_scan, col_search = st.columns([2, 2, 3])
-
-with col_cap:
-    capital = st.number_input(
-        "💵 Capital (USD)",
-        min_value=100.0,
-        max_value=1_000_000.0,
-        value=st.session_state["capital"],
-        step=500.0,
-        label_visibility="collapsed",
-    )
-    st.session_state["capital"] = capital
-
-with col_scan:
-    scan_btn = st.button("⚡ Find Best Trades", type="primary", use_container_width=True)
-
-with col_search:
-    search_col, search_btn_col = st.columns([3, 1])
-    with search_col:
-        ticker_search = st.text_input(
-            "Search",
-            placeholder="Search ticker (e.g. AAPL)",
+# ═══════════════════════════════════════════════════════════════════
+# TAB 1: ELITE SCANNER (Main scanner with whale badges)
+# ═══════════════════════════════════════════════════════════════════
+with tab1:
+    # Controls row
+    col_cap, col_scan, col_search = st.columns([2, 2, 3])
+    
+    with col_cap:
+        capital = st.number_input(
+            "💵 Capital (USD)",
+            min_value=100.0,
+            max_value=1_000_000.0,
+            value=st.session_state["capital"],
+            step=500.0,
             label_visibility="collapsed",
-        ).upper().strip()
-    with search_btn_col:
-        analyze_btn = st.button("Analyze", use_container_width=True)
-
-st.markdown("---")
-
-# Handle single stock analysis
-if ticker_search and analyze_btn:
-    with st.spinner(f"Analyzing {ticker_search}..."):
-        result = analyze_ticker(ticker_search, capital)
+            key="capital_input"
+        )
+        st.session_state["capital"] = capital
     
-    if result is None:
-        ind, df, news = fetch_data(ticker_search)
-        if ind:
-            ns = news_score(news)
-            win_prob, reasons = calculate_win_probability(ind, ns)
-            pos = calc_position(ind, capital)
-            st.warning(f"⚠️ **{ticker_search}**: {win_prob:.0f}% win probability — Below 65% threshold")
-            st.markdown(f"**Entry:** ${ind['price']:.2f} | **Stop:** ${pos['sl']:.2f} | **Target:** ${pos['tp']:.2f} | **Profit:** +{pos['tp_pct']:.1f}%")
-            if reasons:
-                with st.expander("View Analysis"):
-                    for title, text in reasons[:3]:
-                        st.markdown(f"**{title}**: {text}")
+    with col_scan:
+        scan_btn = st.button("⚡ Find Best Trades", type="primary", use_container_width=True, key="scan_btn")
+    
+    with col_search:
+        search_col, search_btn_col = st.columns([3, 1])
+        with search_col:
+            ticker_search = st.text_input(
+                "Search",
+                placeholder="Search ticker (e.g. AAPL)",
+                label_visibility="collapsed",
+                key="ticker_search"
+            ).upper().strip()
+        with search_btn_col:
+            analyze_btn = st.button("Analyze", use_container_width=True, key="analyze_btn")
+    
+    st.markdown("---")
+    
+    # Handle single stock analysis
+    if ticker_search and analyze_btn:
+        with st.spinner(f"Analyzing {ticker_search}..."):
+            result = analyze_ticker(ticker_search, capital)
+            # Also get whale data
+            whale_info = detect_smart_money(ticker_search)
+            st.session_state["whale_data"][ticker_search] = whale_info
+        
+        if result is None:
+            ind, df, news = fetch_data(ticker_search)
+            if ind:
+                ns = news_score(news)
+                win_prob, reasons = calculate_win_probability(ind, ns)
+                pos = calc_position(ind, capital)
+                st.warning(f"⚠️ **{ticker_search}**: {win_prob:.0f}% win probability — Below 65% threshold")
+                st.markdown(f"**Entry:** ${ind['price']:.2f} | **Stop:** ${pos['sl']:.2f} | **Target:** ${pos['tp']:.2f} | **Profit:** +{pos['tp_pct']:.1f}%")
+                
+                # Show whale data even for filtered stocks
+                if whale_info['has_whale_activity']:
+                    st.markdown("**🐋 Whale Activity Detected:**")
+                    for sig in whale_info['signals'][:2]:
+                        st.info(f"**{sig['title']}**: {sig['text']}")
+                
+                if reasons:
+                    with st.expander("View Analysis"):
+                        for title, text in reasons[:3]:
+                            st.markdown(f"**{title}**: {text}")
+            else:
+                st.error(f"Could not fetch data for {ticker_search}")
         else:
-            st.error(f"Could not fetch data for {ticker_search}")
-    else:
-        st.session_state["scan_results"] = [result]
-
-# Handle market scan
-if scan_btn:
-    st.session_state["scan_results"] = None
-    progress_bar = st.progress(0, text=f"Scanning {len(ALL_TICKERS)} stocks...")
+            result["whale"] = whale_info
+            st.session_state["scan_results"] = [result]
     
-    def update_progress(pct):
-        progress_bar.progress(pct, text=f"Analyzing... {int(pct*100)}%")
+    # Handle market scan
+    if scan_btn:
+        st.session_state["scan_results"] = None
+        st.session_state["whale_data"] = {}
+        progress_bar = st.progress(0, text=f"Scanning {len(ALL_TICKERS)} stocks...")
+        
+        def update_progress(pct):
+            progress_bar.progress(pct, text=f"Analyzing... {int(pct*100)}%")
+        
+        results = scan_market_parallel(ALL_TICKERS, capital, update_progress)
+        
+        # Get whale data for top picks
+        progress_bar.progress(0.95, text="Detecting Smart Money activity...")
+        for r in results:
+            whale_info = detect_smart_money(r['ticker'])
+            r['whale'] = whale_info
+            st.session_state["whale_data"][r['ticker']] = whale_info
+        
+        progress_bar.empty()
+        st.session_state["scan_results"] = results
     
-    results = scan_market_parallel(ALL_TICKERS, capital, update_progress)
-    progress_bar.empty()
-    st.session_state["scan_results"] = results
-
-# Display results
-results = st.session_state.get("scan_results")
-
-if results is not None:
-    if len(results) == 0:
-        st.markdown("""
-        <div class="no-picks">
-            🔍 <b>No high-probability setups found right now.</b><br><br>
-            <span style="font-size:0.9rem;">The market may not have any stocks meeting our strict 65%+ win probability criteria.<br>
-            This is actually a good sign — it means we're being selective and protecting your capital.<br>
-            Check back later or search for a specific ticker.</span>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        # Header with diversification note
-        st.markdown(f"### 🏆 TOP {len(results)} HIGH-PROBABILITY PICKS")
-        st.markdown(f"*Diversified by sector · Scanned {len(ALL_TICKERS)} stocks · Only showing 65%+ setups*")
-        
-        # Display picks with rank
-        rank_labels = ["🥇", "🥈", "🥉"]
-        rank_classes = ["rank-1", "rank-2", "rank-3"]
-        
-        for i, r in enumerate(results):
-            ind = r["ind"]
-            pos = r["pos"]
-            win_prob = r["win_prob"]
-            reasons = r["reasons"]
-            sector = r.get("sector", "Unknown")
-            
-            rank_label = rank_labels[i] if i < 3 else f"#{i+1}"
-            rank_class = rank_classes[i] if i < 3 else ""
-            
-            # Supertrend indicator badge
-            st_badge = "🟢 ST" if ind.get("supertrend_bull", False) else "🔴 ST"
-            
-            st.markdown(f"""
-            <div class="pick-card {rank_class}">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
-                    <div>
-                        <span style="font-size:1.5rem;margin-right:0.5rem;">{rank_label}</span>
-                        <span class="ticker">{r['ticker']}</span>
-                        <span class="price">${ind['price']:.2f}</span>
-                        <span style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:0.75rem;color:#8b949e;margin-left:8px;">{sector}</span>
-                        <span style="font-size:0.75rem;margin-left:4px;">{st_badge}</span>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="win-prob">{win_prob:.0f}%</div>
-                        <div class="win-label">Win Probability</div>
-                    </div>
-                </div>
-                <div class="levels">
-                    <span>Entry: <b>${ind['price']:.2f}</b></span>
-                    <span class="sl">Stop: <b>${pos['sl']:.2f}</b> (-{pos['sl_pct']:.1f}%)</span>
-                    <span class="tp">Target: <b>${pos['tp']:.2f}</b> (+{pos['tp_pct']:.1f}%)</span>
-                    <span>R:R <b>1:{pos['rr']:.1f}</b></span>
-                </div>
+    # Display results
+    results = st.session_state.get("scan_results")
+    
+    if results is not None:
+        if len(results) == 0:
+            st.markdown("""
+            <div class="no-picks">
+                🔍 <b>No high-probability setups found right now.</b><br><br>
+                <span style="font-size:0.9rem;">The market may not have any stocks meeting our strict 65%+ win probability criteria.<br>
+                This is actually a good sign — it means we're being selective and protecting your capital.<br>
+                Check back later or search for a specific ticker.</span>
             </div>
             """, unsafe_allow_html=True)
+        else:
+            # Header with diversification note
+            st.markdown(f"### 🏆 TOP {len(results)} HIGH-PROBABILITY PICKS")
+            st.markdown(f"*Diversified by sector · Scanned {len(ALL_TICKERS)} stocks · Smart Money detection enabled*")
             
-            # Show top reasons WHY this is a good pick
-            if reasons:
-                with st.expander(f"💡 Why {r['ticker']}? — See the analysis"):
-                    st.markdown("**Why this stock has high win probability:**")
-                    for title, text in reasons:
-                        st.markdown(f"""
-                        <div class="reason-box">
-                            <div class="reason-title">{title}</div>
-                            <div class="reason-text">{text}</div>
+            # Display picks with rank
+            rank_labels = ["🥇", "🥈", "🥉"]
+            rank_classes = ["rank-1", "rank-2", "rank-3"]
+            
+            for i, r in enumerate(results):
+                ind = r["ind"]
+                pos = r["pos"]
+                win_prob = r["win_prob"]
+                reasons = r["reasons"]
+                sector = r.get("sector", "Unknown")
+                whale = r.get("whale", {})
+                has_whale = whale.get("has_whale_activity", False)
+                
+                rank_label = rank_labels[i] if i < 3 else f"#{i+1}"
+                rank_class = rank_classes[i] if i < 3 else ""
+                
+                # Supertrend indicator badge
+                st_badge = "🟢 ST" if ind.get("supertrend_bull", False) else "🔴 ST"
+                whale_badge = '<span class="whale-badge">🐋 WHALE</span>' if has_whale else ""
+                
+                st.markdown(f"""
+                <div class="pick-card {rank_class}">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+                        <div>
+                            <span style="font-size:1.5rem;margin-right:0.5rem;">{rank_label}</span>
+                            <span class="ticker">{r['ticker']}</span>
+                            <span class="price">${ind['price']:.2f}</span>
+                            <span style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:0.75rem;color:#8b949e;margin-left:8px;">{sector}</span>
+                            <span style="font-size:0.75rem;margin-left:4px;">{st_badge}</span>
+                            {whale_badge}
                         </div>
-                        """, unsafe_allow_html=True)
-                    
-                    # Key metrics
-                    st.markdown("---")
-                    col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("RSI", f"{ind['rsi']:.0f}")
-                    col2.metric("ADX (Trend)", f"{ind['adx']:.0f}")
-                    col3.metric("Volume", f"{ind['vol_ratio']:.1f}x")
-                    col4.metric("vs SPY", f"{ind['rs_vs_spy']:+.1f}%")
-                    
-                    # Chart
-                    st.markdown("---")
-                    fig = make_chart(r["df"], ind, pos)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Position sizing
-                    st.markdown("---")
-                    st.markdown("**Your Position (based on your capital):**")
-                    pc1, pc2, pc3, pc4 = st.columns(4)
-                    pc1.metric("Shares to Buy", f"{pos['shares']:.2f}")
-                    pc2.metric("Capital Used", f"${pos['cap_used']:.0f}")
-                    pc3.metric("Max Loss", f"${pos['max_loss']:.0f}", delta="-1.5%", delta_color="inverse")
-                    pc4.metric("Max Gain", f"${pos['max_gain']:.0f}", delta=f"+{pos['tp_pct']:.1f}%")
+                        <div style="text-align:right;">
+                            <div class="win-prob">{win_prob:.0f}%</div>
+                            <div class="win-label">Win Probability</div>
+                        </div>
+                    </div>
+                    <div class="levels">
+                        <span>Entry: <b>${ind['price']:.2f}</b></span>
+                        <span class="sl">Stop: <b>${pos['sl']:.2f}</b> (-{pos['sl_pct']:.1f}%)</span>
+                        <span class="tp">Target: <b>${pos['tp']:.2f}</b> (+{pos['tp_pct']:.1f}%)</span>
+                        <span>R:R <b>1:{pos['rr']:.1f}</b></span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Show top reasons WHY this is a good pick
+                if reasons:
+                    with st.expander(f"💡 Why {r['ticker']}? — See full analysis"):
+                        # Whale Activity Section (if present)
+                        if has_whale and whale.get("signals"):
+                            st.markdown("### 🐋 Smart Money Activity")
+                            for sig in whale["signals"]:
+                                st.markdown(f"""
+                                <div class="whale-box">
+                                    <div class="whale-title">{sig['title']}</div>
+                                    <div class="whale-text">{sig['text']}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            st.markdown("---")
+                        
+                        st.markdown("### 📊 Technical Analysis")
+                        for title, text in reasons:
+                            st.markdown(f"""
+                            <div class="reason-box">
+                                <div class="reason-title">{title}</div>
+                                <div class="reason-text">{text}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Key metrics
+                        st.markdown("---")
+                        col1, col2, col3, col4 = st.columns(4)
+                        col1.metric("RSI", f"{ind['rsi']:.0f}")
+                        col2.metric("ADX (Trend)", f"{ind['adx']:.0f}")
+                        col3.metric("Volume", f"{ind['vol_ratio']:.1f}x")
+                        col4.metric("vs SPY", f"{ind['rs_vs_spy']:+.1f}%")
+                        
+                        # Chart
+                        st.markdown("---")
+                        fig = make_chart(r["df"], ind, pos)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Position sizing
+                        st.markdown("---")
+                        st.markdown("**Your Position (based on your capital):**")
+                        pc1, pc2, pc3, pc4 = st.columns(4)
+                        pc1.metric("Shares to Buy", f"{pos['shares']:.2f}")
+                        pc2.metric("Capital Used", f"${pos['cap_used']:.0f}")
+                        pc3.metric("Max Loss", f"${pos['max_loss']:.0f}", delta="-1.5%", delta_color="inverse")
+                        pc4.metric("Max Gain", f"${pos['max_gain']:.0f}", delta=f"+{pos['tp_pct']:.1f}%")
+    
+    elif not scan_btn and not analyze_btn:
+        # Initial state
+        st.markdown("""
+        <div style="text-align:center;padding:3rem;color:#666;">
+            <div style="font-size:4rem;margin-bottom:1rem;">⚡</div>
+            <div style="font-size:1.4rem;margin-bottom:0.5rem;color:#00ff88;">Find Your Next Winning Trade</div>
+            <div style="font-size:0.95rem;margin-bottom:1.5rem;">
+                Advanced algorithms scan 140+ stocks and show only the <b>TOP 3</b><br>
+                with <b>65%+ win probability</b> for swing trading (2-10 days).
+            </div>
+            <div style="font-size:0.85rem;color:#555;">
+                ✓ 10 technical indicators · ✓ Smart Money detection<br>
+                ✓ Market regime analysis · ✓ Sector diversification<br>
+                ✓ Options flow analysis · ✓ Dark pool proxy
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-elif not scan_btn and not analyze_btn:
-    # Initial state
+# ═══════════════════════════════════════════════════════════════════
+# TAB 2: WHALE RADAR (Dedicated Smart Money Analysis)
+# ═══════════════════════════════════════════════════════════════════
+with tab2:
+    st.markdown("### 🐋 Whale Radar — Smart Money Detection")
+    st.markdown("*Detect institutional activity using options flow and volume analysis*")
+    
     st.markdown("""
-    <div style="text-align:center;padding:3rem;color:#666;">
-        <div style="font-size:4rem;margin-bottom:1rem;">⚡</div>
-        <div style="font-size:1.4rem;margin-bottom:0.5rem;color:#00ff88;">Find Your Next Winning Trade</div>
-        <div style="font-size:0.95rem;margin-bottom:1.5rem;">
-            Advanced algorithms scan 140+ stocks and show only the <b>TOP 3</b><br>
-            with <b>65%+ win probability</b> for swing trading (2-10 days).
-        </div>
-        <div style="font-size:0.85rem;color:#555;">
-            ✓ 9 technical indicators · ✓ Trend strength analysis<br>
-            ✓ Market relative strength · ✓ Volume confirmation<br>
-            ✓ Breakout/pullback detection · ✓ News sentiment
-        </div>
+    <div style="background:#1a1a3a;border:1px solid #6366f1;border-radius:8px;padding:1rem;margin:1rem 0;">
+        <b style="color:#a5b4fc;">How it works:</b><br>
+        <span style="color:#9ca3af;font-size:0.9rem;">
+        • <b>Unusual Options Activity (UOA)</b>: Detects when option volume exceeds open interest by 3x+ — a sign of institutional "sweeps"<br>
+        • <b>Dark Pool Proxy</b>: Identifies high volume with minimal price movement — classic institutional accumulation<br>
+        • <b>Put/Call Ratio</b>: Measures hidden sentiment in the options market
+        </span>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Whale analysis input
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        whale_ticker = st.text_input(
+            "Enter ticker to analyze",
+            placeholder="Enter ticker (e.g. NVDA, AAPL, TSLA)",
+            label_visibility="collapsed",
+            key="whale_ticker"
+        ).upper().strip()
+    with col2:
+        whale_btn = st.button("🔍 Detect Whales", type="primary", use_container_width=True, key="whale_btn")
+    
+    st.markdown("---")
+    
+    if whale_ticker and whale_btn:
+        with st.spinner(f"Scanning {whale_ticker} for institutional activity..."):
+            whale_info = detect_smart_money(whale_ticker)
+            st.session_state["whale_data"][whale_ticker] = whale_info
+        
+        if whale_info["has_whale_activity"]:
+            st.success(f"🐋 **WHALE ACTIVITY DETECTED** in {whale_ticker}!")
+            
+            for sig in whale_info["signals"]:
+                signal_color = "#6366f1" if "CALL" in sig["type"] or "BULLISH" in sig["type"] else "#f59e0b" if "PUT" in sig["type"] or "BEARISH" in sig["type"] else "#22c55e"
+                st.markdown(f"""
+                <div style="background:linear-gradient(135deg, #1a1a3a 0%, #1a2a4a 100%);
+                            border-left:4px solid {signal_color};padding:1rem;margin:0.8rem 0;border-radius:0 8px 8px 0;">
+                    <div style="color:#a5b4fc;font-weight:600;font-size:1rem;">{sig['title']}</div>
+                    <div style="color:#9ca3af;font-size:0.9rem;margin-top:0.5rem;">{sig['text']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Also show basic price info
+            try:
+                t = yf.Ticker(whale_ticker)
+                hist = t.history(period="5d")
+                if not hist.empty:
+                    price = hist['Close'].iloc[-1]
+                    chg = (hist['Close'].iloc[-1] - hist['Close'].iloc[-2]) / hist['Close'].iloc[-2] * 100
+                    vol = hist['Volume'].iloc[-1]
+                    avg_vol = hist['Volume'].mean()
+                    
+                    st.markdown("### 📊 Current Status")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Price", f"${price:.2f}", f"{chg:+.2f}%")
+                    c2.metric("Volume", f"{vol/1e6:.1f}M")
+                    c3.metric("Vol vs Avg", f"{vol/avg_vol:.1f}x")
+            except:
+                pass
+        else:
+            st.info(f"No significant whale activity detected in {whale_ticker} at this time.")
+            st.markdown("*This doesn't mean institutions aren't involved — just that our heuristics didn't detect unusual patterns.*")
+    
+    # Show whale data from scan results
+    if st.session_state.get("whale_data"):
+        st.markdown("### 📋 Recent Whale Scans")
+        
+        whale_found = [(t, w) for t, w in st.session_state["whale_data"].items() if w.get("has_whale_activity")]
+        
+        if whale_found:
+            for ticker, whale in whale_found:
+                with st.expander(f"🐋 {ticker} — {whale['signal_count']} signals detected"):
+                    for sig in whale["signals"]:
+                        st.markdown(f"**{sig['title']}**: {sig['text']}")
+        else:
+            st.markdown("*No whale activity detected in recent scans. Scan some stocks or use the detector above.*")
+    else:
+        st.markdown("*Enter a ticker above to scan for institutional activity, or run the Elite Scanner to check the top picks.*")

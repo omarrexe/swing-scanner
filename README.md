@@ -1,6 +1,6 @@
 # ⚡ Elite Swing Scanner
 
-A professional-grade US stock market scanner for swing trading. Uses a **10-factor Win Probability Algorithm** to find high-probability setups with 65%+ win rates.
+A professional-grade US stock market scanner for swing trading. Features **Smart Money (Whale) Detection**, **10-factor Win Probability Algorithm**, and **Market Regime Analysis**.
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io)
 
@@ -11,10 +11,31 @@ A professional-grade US stock market scanner for swing trading. Uses a **10-fact
 - **Scans 142 stocks** across 16 sectors (Tech, Semis, Finance, Energy, etc.)
 - **10-factor scoring system** calculates Win Probability (0-100%)
 - **Only shows TOP 3 picks** with 65%+ probability — no noise
+- **🐋 Whale Radar** — Detects institutional "Smart Money" activity
 - **Market Regime Detection** — checks if SPY is bullish before trading
 - **Sector Diversification** — ensures picks aren't all from same sector
 - **Clear explanations** — tells you WHY each stock is a good pick
-- **Precise trade levels** — Entry, Stop Loss, Take Profit, Position Size
+
+---
+
+## 🐋 NEW: Smart Money (Whale Radar) Detection
+
+Detect institutional activity using FREE data — no expensive Bloomberg terminal needed!
+
+### Unusual Options Activity (UOA)
+- Scans options chains for contracts where **Volume > 3x Open Interest**
+- This is a strong proxy for institutional "sweeps" (large directional bets)
+- Calculates **Put/Call Ratio** to gauge hidden sentiment
+
+### Dark Pool Proxy
+- Detects high volume spikes (4x+ average) with **tight price spreads**
+- This pattern indicates institutional "absorption" — buying without moving price
+- Classic signature of dark pool / block trade activity
+
+### How It Appears
+- **🐋 WHALE badge** on stocks with detected activity
+- Detailed breakdown showing exact options contracts and volume ratios
+- Dedicated "Whale Radar" tab for deep analysis on any ticker
 
 ---
 
@@ -45,8 +66,6 @@ Before showing any picks, the scanner analyzes **SPY (S&P 500)** to determine ma
 - 🟡 **NEUTRAL** (Score 20-49): Be selective, trade quality only
 - 🔴 **BEARISH** (Score <20): Avoid long positions
 
-This prevents "swimming against the tide" when the overall market is weak.
-
 ---
 
 ## 🛡️ Risk Management
@@ -61,13 +80,22 @@ Professional risk rules built-in:
 
 ---
 
+## 📱 Two-Tab Interface
+
+| Tab | Purpose |
+|-----|---------|
+| **⚡ Elite Scanner** | Main scanner with technical analysis + whale badges |
+| **🐋 Whale Radar** | Dedicated Smart Money detection for any ticker |
+
+---
+
 ## ⚡ Technical Features
 
 - **Parallel scanning** — 10 threads for fast analysis
 - **pandas-ta integration** — 130+ professional indicators
 - **Supertrend indicator** — Powerful trend confirmation
-- **Sector diversification** — 16 sector categories
-- **Real-time data** — Via yfinance API
+- **Options chain analysis** — Vol/OI ratio detection
+- **Real-time data** — Via yfinance API (free)
 
 ---
 
@@ -112,13 +140,14 @@ swing-scanner/
 
 ## 📈 Stocks Covered (142 Total)
 
-**Tech**: AAPL, MSFT, GOOGL, META, AMZN, NFLX, CRM, ADBE, ORCL, IBM, CSCO, INTC  
-**Semiconductors**: NVDA, AMD, AVGO, QCOM, MU, MRVL, AMAT, LRCX, KLAC, TSM, ASML  
-**Finance**: JPM, BAC, WFC, GS, MS, C, BLK, SCHW, AXP  
+**Tech**: AAPL, MSFT, GOOGL, META, AMZN, NFLX, CRM, ADBE, ORCL  
+**Semiconductors**: NVDA, AMD, AVGO, QCOM, MU, TSM  
+**Finance**: JPM, BAC, WFC, GS, MS, C, BLK  
 **Payments**: V, MA, PYPL, SQ  
-**Retail**: WMT, COST, TGT, HD, LOW, NKE, SBUX, MCD, DPZ  
-**Health**: UNH, JNJ, PFE, ABBV, MRK, LLY, BMY, AMGN, GILD, MRNA, ISRG  
-**Energy**: XOM, CVX, COP, SLB, OXY, EOG, PXD, DVN, MPC, VLO, PSX  
+**Retail**: WMT, COST, TGT, HD, LOW, NKE, SBUX, MCD  
+**Health**: UNH, JNJ, PFE, ABBV, MRK, LLY, MRNA  
+**Energy**: XOM, CVX, COP, SLB, OXY  
+**EV**: TSLA, RIVN, LCID, NIO  
 **And more...**
 
 ---
@@ -129,6 +158,7 @@ swing-scanner/
 
 - Not financial advice
 - Past performance doesn't guarantee future results
+- Smart Money detection is heuristic-based, not 100% accurate
 - Always do your own research
 - Never invest more than you can afford to lose
 
