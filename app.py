@@ -1,13 +1,6 @@
 """
-⚡ SNIPER MODE — Swing Trading Scanner
-Quality over Quantity. One Perfect Pick.
-
-Designed for:
-- Small capital ($500-$1,000)
-- Concentrated positions (all-in on 1 stock)
-- Higher probability (70%+ only)
-- Bigger profit targets (10%+)
-- Hold 1-3 weeks
+SNIPER MODE — Swing Trading Scanner
+One Perfect Pick. Quality Over Quantity.
 """
 
 import streamlit as st
@@ -21,189 +14,391 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings('ignore')
 
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
 #  PAGE CONFIG
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="⚡ Sniper Mode",
-    page_icon="🎯",
+    page_title="Sniper Mode",
+    page_icon="◎",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# ──────────────────────────────────────────────────────────────────
-#  DARK MINIMAL CSS
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  APPLE-STYLE MINIMAL CSS
+# ══════════════════════════════════════════════════════════════════
 CSS = """
 <style>
-    .main .block-container { max-width: 900px; padding: 1rem 2rem; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    .header { 
-        font-size: 2rem; font-weight: 700; color: #ffd700;
-        text-align: center; margin-bottom: 0.2rem;
-    }
-    .subheader { 
-        color: #888; font-size: 0.9rem; text-align: center; 
-        margin-bottom: 1.5rem;
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    
+    .main .block-container { 
+        max-width: 800px; 
+        padding: 2rem 1.5rem; 
     }
     
-    .market-box {
-        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
-        border-radius: 10px; padding: 1rem; margin-bottom: 1rem;
-        border: 1px solid #30363d;
+    /* Hide Streamlit branding */
+    #MainMenu, footer, header { visibility: hidden; }
+    .stDeployButton { display: none; }
+    
+    /* Header */
+    .app-header {
+        text-align: center;
+        padding: 3rem 0 2rem 0;
+    }
+    .app-title {
+        font-size: 2.5rem;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: -0.5px;
+        margin: 0;
+    }
+    .app-subtitle {
+        font-size: 1rem;
+        color: #86868b;
+        font-weight: 400;
+        margin-top: 0.5rem;
     }
     
-    .sniper-card {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border: 3px solid #ffd700;
-        border-radius: 16px;
-        padding: 2rem;
-        margin: 1.5rem 0;
-        box-shadow: 0 0 30px rgba(255,215,0,0.15);
+    /* Market Status Pill */
+    .market-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin: 1.5rem auto;
     }
+    .market-bullish { background: rgba(48, 209, 88, 0.15); color: #30d158; }
+    .market-neutral { background: rgba(255, 214, 10, 0.15); color: #ffd60a; }
+    .market-bearish { background: rgba(255, 69, 58, 0.15); color: #ff453a; }
     
-    .ticker-big { 
-        font-size: 3rem; font-weight: 800; color: #fff;
-        letter-spacing: 2px;
-    }
-    .price-big { 
-        font-size: 1.5rem; color: #888; margin-left: 1rem;
-    }
-    
-    .prob-container {
-        text-align: center; padding: 1rem;
-        background: #0d1117; border-radius: 12px;
-        margin: 1rem 0;
-    }
-    .prob-number { 
-        font-size: 4rem; font-weight: 800; color: #00ff88;
-    }
-    .prob-label { 
-        font-size: 0.9rem; color: #666; text-transform: uppercase;
-        letter-spacing: 2px;
-    }
-    
-    .levels-box {
-        display: flex; justify-content: space-around;
-        background: #0d1117; border-radius: 10px;
-        padding: 1.5rem; margin: 1rem 0;
-    }
-    .level-item { text-align: center; }
-    .level-value { font-size: 1.5rem; font-weight: 700; }
-    .level-label { font-size: 0.75rem; color: #666; text-transform: uppercase; }
-    .sl-color { color: #f85149; }
-    .tp-color { color: #00ff88; }
-    .entry-color { color: #ffd700; }
-    
-    .reason-box {
-        background: #1a2332; border-left: 3px solid #ffd700;
-        padding: 0.8rem 1rem; margin: 0.5rem 0;
-        border-radius: 0 8px 8px 0;
-    }
-    .reason-title { color: #ffd700; font-weight: 600; }
-    .reason-text { color: #aaa; font-size: 0.9rem; margin-top: 0.3rem; }
-    
-    .action-box {
-        background: linear-gradient(135deg, #1a3d2e 0%, #0d2818 100%);
-        border: 2px solid #238636;
-        border-radius: 12px; padding: 1.5rem;
-        margin: 1rem 0;
-    }
-    
-    .warning-box {
-        background: #3d2a1a; border: 1px solid #d29922;
-        border-radius: 8px; padding: 1rem; margin: 1rem 0;
-        color: #ffd700;
-    }
-    
-    .no-signal {
-        text-align: center; padding: 3rem;
-        color: #666; font-size: 1.1rem;
-    }
-    
+    /* Scan Button */
     .stButton > button {
-        background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
-        color: #000; border: none; border-radius: 10px;
-        font-weight: 700; padding: 0.8rem 2rem; font-size: 1.1rem;
+        background: #0a84ff;
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 1rem 2rem;
         width: 100%;
+        transition: all 0.2s ease;
     }
     .stButton > button:hover {
-        background: linear-gradient(135deg, #ffaa00 0%, #ff8800 100%);
+        background: #0077ed;
+        transform: scale(1.01);
+    }
+    
+    /* Result Card */
+    .result-card {
+        background: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 2rem 0;
+    }
+    
+    .ticker-display {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 0.5rem;
+    }
+    .ticker-symbol {
+        font-size: 3rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -1px;
+    }
+    .ticker-price {
+        font-size: 1.5rem;
+        color: #86868b;
+        font-weight: 500;
+    }
+    .ticker-sector {
+        display: inline-block;
+        background: rgba(255,255,255,0.1);
+        color: #fff;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Probability Circle */
+    .prob-circle {
+        text-align: center;
+        padding: 2rem 0;
+    }
+    .prob-number {
+        font-size: 5rem;
+        font-weight: 700;
+        color: #30d158;
+        line-height: 1;
+    }
+    .prob-label {
+        font-size: 0.8rem;
+        color: #86868b;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 0.5rem;
+    }
+    
+    /* Levels Grid */
+    .levels-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        padding: 1.5rem;
+        background: rgba(0,0,0,0.3);
+        border-radius: 16px;
+        margin: 1.5rem 0;
+    }
+    .level-item {
+        text-align: center;
+    }
+    .level-value {
+        font-size: 1.3rem;
+        font-weight: 600;
+    }
+    .level-label {
+        font-size: 0.7rem;
+        color: #86868b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 4px;
+    }
+    .green { color: #30d158; }
+    .red { color: #ff453a; }
+    .blue { color: #0a84ff; }
+    .white { color: #fff; }
+    
+    /* Capital Input Card */
+    .capital-card {
+        background: rgba(10, 132, 255, 0.1);
+        border: 1px solid rgba(10, 132, 255, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    .capital-title {
+        color: #0a84ff;
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Trade Plan */
+    .trade-plan {
+        background: rgba(48, 209, 88, 0.1);
+        border: 1px solid rgba(48, 209, 88, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+    .plan-title {
+        color: #30d158;
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    .plan-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    .plan-item {
+        color: #fff;
+        font-size: 0.9rem;
+    }
+    .plan-item span { color: #86868b; }
+    
+    /* Reason List */
+    .reason-item {
+        padding: 1rem;
+        background: rgba(255,255,255,0.05);
+        border-radius: 12px;
+        margin: 0.5rem 0;
+    }
+    .reason-title {
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    .reason-text {
+        color: #86868b;
+        font-size: 0.85rem;
+        margin-top: 4px;
+    }
+    
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    .empty-title {
+        font-size: 1.3rem;
+        color: #fff;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    .empty-text {
+        color: #86868b;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+    
+    /* Backtest Section */
+    .backtest-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    .backtest-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #fff;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .stat-box {
+        background: rgba(255,255,255,0.05);
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .stat-label {
+        font-size: 0.7rem;
+        color: #86868b;
+        text-transform: uppercase;
+        margin-top: 4px;
+    }
+    
+    .signal-row {
+        display: grid;
+        grid-template-columns: 80px 1fr 80px 80px;
+        gap: 1rem;
+        padding: 0.8rem 1rem;
+        background: rgba(255,255,255,0.03);
+        border-radius: 10px;
+        margin: 0.3rem 0;
+        align-items: center;
+        font-size: 0.85rem;
+    }
+    .signal-ticker {
+        font-weight: 600;
+        color: #fff;
+    }
+    .signal-date {
+        color: #86868b;
+    }
+    .signal-result {
+        text-align: right;
+        font-weight: 600;
+    }
+    
+    /* Divider */
+    hr {
+        border: none;
+        border-top: 1px solid rgba(255,255,255,0.1);
+        margin: 2rem 0;
+    }
+    
+    /* Hide number input spinners */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
     }
 </style>
 """
 
-# ──────────────────────────────────────────────────────────────────
-#  QUALITY STOCK UNIVERSE — Only the best 40 stocks
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  STOCK UNIVERSE — 40 Quality Stocks
+# ══════════════════════════════════════════════════════════════════
 STOCK_SECTORS = {
-    # Tech Giants (most liquid, predictable)
     "AAPL": "Tech", "MSFT": "Tech", "GOOGL": "Tech", "META": "Tech", "AMZN": "Tech",
-    # Semiconductors (strong trends)
     "NVDA": "Semis", "AMD": "Semis", "AVGO": "Semis", "QCOM": "Semis",
-    # Finance (stable, good swings)
     "JPM": "Finance", "GS": "Finance", "V": "Payments", "MA": "Payments",
-    # Healthcare (defensive + growth)
     "LLY": "Health", "UNH": "Health", "JNJ": "Health", "ABBV": "Health",
-    # Consumer (predictable patterns)
     "WMT": "Retail", "COST": "Retail", "HD": "Retail", "NKE": "Consumer",
     "MCD": "Consumer", "SBUX": "Consumer",
-    # Energy (momentum plays)
     "XOM": "Energy", "CVX": "Energy",
-    # EV & Growth (bigger swings)
     "TSLA": "EV",
-    # Cloud & SaaS (growth momentum)
     "CRM": "Cloud", "ADBE": "Cloud", "NOW": "Cloud", "SNOW": "Cloud",
-    # Industrial (stable trends)
     "CAT": "Industrial", "BA": "Industrial", "DE": "Industrial",
-    # Media
     "DIS": "Media", "NFLX": "Media",
-    # Fintech
     "SQ": "Fintech", "PYPL": "Fintech",
 }
-
 ALL_TICKERS = list(STOCK_SECTORS.keys())
 
-# ──────────────────────────────────────────────────────────────────
-#  SNIPER CONFIGURATION — Aggressive but calculated
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  CONFIGURATION
+# ══════════════════════════════════════════════════════════════════
 CFG = {
-    "min_win_prob"      : 70,      # Higher threshold (was 65)
-    "min_profit_pct"    : 10.0,    # Bigger targets (was 6)
-    "min_rr"            : 2.5,     # Better reward/risk (was 2.0)
-    "sl_atr_mult"       : 1.5,     # Stop loss = 1.5x ATR
-    "tp_atr_mult"       : 4.0,     # Take profit = 4x ATR (was 3.5)
-    "risk_per_trade_pct": 5.0,     # Risk 5% per trade (aggressive)
-    "max_position_pct"  : 90.0,    # Use up to 90% of capital
-    "scan_threads"      : 8,
+    "min_win_prob": 70,
+    "min_profit_pct": 10.0,
+    "min_rr": 2.5,
+    "sl_atr_mult": 1.5,
+    "tp_atr_mult": 4.0,
+    "risk_per_trade_pct": 5.0,
+    "max_position_pct": 90.0,
+    "scan_threads": 8,
 }
 
-# ──────────────────────────────────────────────────────────────────
-#  MARKET REGIME — Only trade in bullish/neutral markets
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  MARKET REGIME
+# ══════════════════════════════════════════════════════════════════
 @st.cache_data(ttl=600)
 def get_market_regime():
-    """Check if SPY is bullish, neutral, or bearish."""
+    """Check SPY health with robust error handling."""
     try:
         spy = yf.Ticker("SPY")
-        df = spy.history(period="3mo", interval="1d")
-        if df.empty or len(df) < 50:
-            return "NEUTRAL", 0, "Cannot fetch SPY"
+        df = spy.history(period="3mo", interval="1d", timeout=10)
+        
+        if df is None or df.empty or len(df) < 50:
+            return "NEUTRAL", 50, "Market data loading..."
         
         c = df["Close"]
+        if c.empty:
+            return "NEUTRAL", 50, "Market data loading..."
+            
         price = float(c.iloc[-1])
+        ema20 = float(c.ewm(span=20).mean().iloc[-1])
+        ema50 = float(c.ewm(span=50).mean().iloc[-1])
         
-        ema20 = c.ewm(span=20).mean().iloc[-1]
-        ema50 = c.ewm(span=50).mean().iloc[-1]
-        
-        # RSI
         delta = c.diff()
         gain = delta.clip(lower=0).rolling(14).mean()
         loss = (-delta.clip(upper=0)).rolling(14).mean()
-        rsi = float((100 - (100 / (1 + gain / loss))).iloc[-1])
+        rs = gain / loss
+        rsi_series = 100 - (100 / (1 + rs))
+        rsi = float(rsi_series.iloc[-1]) if not rsi_series.empty else 50
         
-        # 20-day change
-        chg_20d = (price - c.iloc[-20]) / c.iloc[-20] * 100
+        if len(c) >= 20:
+            chg_20d = (price - float(c.iloc[-20])) / float(c.iloc[-20]) * 100
+        else:
+            chg_20d = 0
         
         score = 0
         if price > ema20 > ema50: score += 40
@@ -213,36 +408,32 @@ def get_market_regime():
         if chg_20d > 3: score += 20
         
         if score >= 60:
-            return "BULLISH", score, "🟢 Market is BULLISH — Good to trade"
+            return "BULLISH", score, "Bullish"
         elif score >= 30:
-            return "NEUTRAL", score, "🟡 Market is NEUTRAL — Be careful"
+            return "NEUTRAL", score, "Neutral"
         else:
-            return "BEARISH", score, "🔴 Market is BEARISH — Wait for better conditions"
+            return "BEARISH", score, "Bearish"
             
-    except Exception:
-        return "NEUTRAL", 0, "Error checking market"
+    except Exception as e:
+        return "NEUTRAL", 50, "Market data loading..."
 
 
-# ──────────────────────────────────────────────────────────────────
-#  WEEKLY TREND CHECK — Must be bullish for swing trading
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  WEEKLY TREND CHECK
+# ══════════════════════════════════════════════════════════════════
 @st.cache_data(ttl=3600)
 def check_weekly_trend(ticker: str):
-    """Weekly trend must be bullish for swing trading."""
     try:
         t = yf.Ticker(ticker)
-        df = t.history(period="1y", interval="1wk", auto_adjust=True)
-        
-        if df.empty or len(df) < 20:
-            return True, 0
+        df = t.history(period="1y", interval="1wk", auto_adjust=True, timeout=10)
+        if df is None or df.empty or len(df) < 20:
+            return True, 50
         
         c = df["Close"]
         price = float(c.iloc[-1])
+        ema10 = float(c.ewm(span=10).mean().iloc[-1])
+        ema20 = float(c.ewm(span=20).mean().iloc[-1])
         
-        ema10 = c.ewm(span=10).mean().iloc[-1]
-        ema20 = c.ewm(span=20).mean().iloc[-1]
-        
-        # Weekly RSI
         delta = c.diff()
         gain = delta.clip(lower=0).rolling(14).mean()
         loss = (-delta.clip(upper=0)).rolling(14).mean()
@@ -255,22 +446,19 @@ def check_weekly_trend(ticker: str):
         elif rsi < 75: score += 10
         
         return score >= 50, score
-        
-    except Exception:
-        return True, 0
+    except:
+        return True, 50
 
 
-# ──────────────────────────────────────────────────────────────────
-#  SIGNAL PERSISTENCE — Setup must be stable for days
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  SIGNAL PERSISTENCE
+# ══════════════════════════════════════════════════════════════════
 @st.cache_data(ttl=3600)
 def check_signal_persistence(ticker: str):
-    """How many days has this setup been valid?"""
     try:
         t = yf.Ticker(ticker)
-        df = t.history(period="1mo", interval="1d", auto_adjust=True)
-        
-        if df.empty or len(df) < 10:
+        df = t.history(period="1mo", interval="1d", auto_adjust=True, timeout=10)
+        if df is None or df.empty or len(df) < 10:
             return 0
         
         c = df["Close"]
@@ -285,55 +473,39 @@ def check_signal_persistence(ticker: str):
                 valid_days += 1
             else:
                 break
-        
         return valid_days
     except:
         return 0
 
 
-# ──────────────────────────────────────────────────────────────────
-#  DATA FETCHING & INDICATORS
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  DATA & INDICATORS
+# ══════════════════════════════════════════════════════════════════
 @st.cache_data(ttl=300)
 def fetch_data(ticker: str):
-    """Fetch price data and compute indicators."""
     try:
         t = yf.Ticker(ticker)
-        df = t.history(period="1y", interval="1d", auto_adjust=True)
-        
-        if df.empty or len(df) < 100:
+        df = t.history(period="1y", interval="1d", auto_adjust=True, timeout=10)
+        if df is None or df.empty or len(df) < 100:
             return None, None
         
-        df.columns = [c.lower() for c in df.columns]
-        c, h, l, v = df["close"], df["high"], df["low"], df["volume"]
+        df.columns = [col.lower() for col in df.columns]
+        c, v = df["close"], df["volume"]
         price = float(c.iloc[-1])
         
-        # EMAs
         df.ta.ema(length=8, append=True)
         df.ta.ema(length=21, append=True)
         df.ta.ema(length=50, append=True)
         df.ta.ema(length=200, append=True)
-        
-        # RSI
         df.ta.rsi(length=14, append=True)
-        
-        # MACD
         df.ta.macd(fast=12, slow=26, signal=9, append=True)
-        
-        # ATR
         df.ta.atr(length=14, append=True)
-        
-        # ADX
         df.ta.adx(length=14, append=True)
-        
-        # Supertrend
         df.ta.supertrend(length=10, multiplier=3, append=True)
         
-        # Volume ratio
         vol_sma20 = v.rolling(20).mean()
         vol_ratio = v / vol_sma20
         
-        # Get indicator values
         ema8 = float(df["EMA_8"].iloc[-1]) if "EMA_8" in df.columns else price
         ema21 = float(df["EMA_21"].iloc[-1]) if "EMA_21" in df.columns else price
         ema50 = float(df["EMA_50"].iloc[-1]) if "EMA_50" in df.columns else price
@@ -350,11 +522,9 @@ def fetch_data(ticker: str):
         plus_di = float(df["DMP_14"].iloc[-1]) if "DMP_14" in df.columns else 20
         minus_di = float(df["DMN_14"].iloc[-1]) if "DMN_14" in df.columns else 20
         
-        # Supertrend direction
         st_col = [col for col in df.columns if "SUPERTd" in col]
         supertrend_bull = int(df[st_col[0]].iloc[-1]) == 1 if st_col else True
         
-        # Changes
         chg_5d = (c.iloc[-1] - c.iloc[-5]) / c.iloc[-5] * 100
         chg_20d = (c.iloc[-1] - c.iloc[-20]) / c.iloc[-20] * 100
         
@@ -376,86 +546,76 @@ def fetch_data(ticker: str):
         return None, None
 
 
-# ──────────────────────────────────────────────────────────────────
-#  WIN PROBABILITY ALGORITHM — Sniper Edition
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  WIN PROBABILITY
+# ══════════════════════════════════════════════════════════════════
 def calculate_win_probability(ind):
-    """Calculate win probability with focus on quality signals."""
     score = 0
-    max_score = 150  # Higher max for more selectivity
+    max_score = 150
     reasons = []
     
-    # 1. TREND ALIGNMENT (35 points) — Most important
     if ind["price"] > ind["ema8"] > ind["ema21"] > ind["ema50"] > ind["ema200"]:
         score += 35
-        reasons.append(("🔥 Perfect Trend", "All EMAs aligned bullish. Strongest possible setup."))
+        reasons.append(("Perfect Trend", "All EMAs aligned bullish"))
     elif ind["price"] > ind["ema8"] > ind["ema21"] > ind["ema50"]:
         score += 25
-        reasons.append(("📈 Strong Trend", "Short & mid EMAs aligned. Good momentum."))
+        reasons.append(("Strong Trend", "Short & mid EMAs aligned"))
     elif ind["price"] > ind["ema21"] > ind["ema50"]:
         score += 15
-        reasons.append(("📊 Uptrend", "Above key moving averages."))
+        reasons.append(("Uptrend", "Above key moving averages"))
     
-    # 2. ADX TREND STRENGTH (20 points)
     if ind["adx"] > 30 and ind["plus_di"] > ind["minus_di"]:
         score += 20
-        reasons.append(("💪 Strong Trend", f"ADX at {ind['adx']:.0f} with bullish direction."))
+        reasons.append(("Strong ADX", f"ADX {ind['adx']:.0f} with bullish direction"))
     elif ind["adx"] > 25:
         score += 12
     elif ind["adx"] > 20:
         score += 5
     
-    # 3. RSI SWEET SPOT (20 points)
     if 45 <= ind["rsi"] <= 60 and ind["rsi"] > ind["rsi_prev"]:
         score += 20
-        reasons.append(("📈 RSI Rising", f"RSI at {ind['rsi']:.0f}, rising. Momentum building."))
+        reasons.append(("RSI Rising", f"RSI {ind['rsi']:.0f}, momentum building"))
     elif 40 <= ind["rsi"] <= 65:
         score += 12
     elif ind["rsi"] < 70:
         score += 5
     
-    # 4. MACD CONFIRMATION (15 points)
     if ind["macd_hist"] > 0 and ind["macd_hist"] > ind["macd_prev"]:
         score += 15
-        reasons.append(("✅ MACD Bullish", "Histogram positive and rising."))
+        reasons.append(("MACD Bullish", "Histogram positive and rising"))
     elif ind["macd_hist"] > 0:
         score += 8
     
-    # 5. VOLUME (15 points)
     if ind["vol_ratio"] > 1.5:
         score += 15
-        reasons.append(("📊 High Volume", f"Volume {ind['vol_ratio']:.1f}x average. Institutions active."))
+        reasons.append(("High Volume", f"{ind['vol_ratio']:.1f}x average volume"))
     elif ind["vol_ratio"] > 1.2:
         score += 10
     elif ind["vol_ratio"] > 1.0:
         score += 5
     
-    # 6. SUPERTREND (15 points)
     if ind["supertrend_bull"]:
         score += 15
-        reasons.append(("🟢 Supertrend Bullish", "Trend indicator confirms upward momentum."))
+        reasons.append(("Supertrend", "Confirms upward momentum"))
     
-    # 7. MOMENTUM (15 points)
     if 2 < ind["chg_5d"] < 10:
         score += 15
-        reasons.append(("🚀 Strong Momentum", f"Up {ind['chg_5d']:.1f}% this week. Moving well."))
+        reasons.append(("Momentum", f"+{ind['chg_5d']:.1f}% this week"))
     elif 0 < ind["chg_5d"] < 15:
         score += 8
     
-    # 8. NOT OVERBOUGHT (15 points bonus)
     if ind["rsi"] < 65:
         score += 15
-        reasons.append(("✅ Room to Run", "Not overbought yet. More upside potential."))
+        reasons.append(("Room to Run", "Not overbought yet"))
     
     win_prob = min(95, int(score / max_score * 100))
     return win_prob, reasons
 
 
-# ──────────────────────────────────────────────────────────────────
-#  POSITION SIZING — For small capital
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  POSITION SIZING
+# ══════════════════════════════════════════════════════════════════
 def calc_position(ind, capital):
-    """Calculate position with aggressive but calculated sizing."""
     price = ind["price"]
     atr = ind["atr"]
     
@@ -466,7 +626,6 @@ def calc_position(ind, capital):
     tp_pct = (tp - price) / price * 100
     rr = tp_pct / sl_pct if sl_pct > 0 else 0
     
-    # Position sizing based on risk
     risk_amount = capital * (CFG["risk_per_trade_pct"] / 100)
     max_position = capital * (CFG["max_position_pct"] / 100)
     
@@ -480,27 +639,24 @@ def calc_position(ind, capital):
     return {
         "sl": sl, "tp": tp, "sl_pct": sl_pct, "tp_pct": tp_pct, "rr": rr,
         "shares": shares, "cap_used": cap_used,
-        "cap_pct": cap_used / capital * 100,
+        "cap_pct": cap_used / capital * 100 if capital > 0 else 0,
         "max_loss": shares * loss_per_share,
         "max_gain": shares * (tp - price),
     }
 
 
-# ──────────────────────────────────────────────────────────────────
-#  ANALYZE SINGLE TICKER — Full analysis
-# ──────────────────────────────────────────────────────────────────
-def analyze_ticker(ticker, capital):
-    """Full analysis of a single ticker."""
+# ══════════════════════════════════════════════════════════════════
+#  ANALYZE TICKER
+# ══════════════════════════════════════════════════════════════════
+def analyze_ticker(ticker, capital=1000):
     ind, df = fetch_data(ticker)
     if ind is None:
         return None
     
-    # Weekly trend check
     weekly_bull, weekly_score = check_weekly_trend(ticker)
     if not weekly_bull:
         return None
     
-    # Signal persistence
     days_valid = check_signal_persistence(ticker)
     if days_valid < 2:
         return None
@@ -508,7 +664,6 @@ def analyze_ticker(ticker, capital):
     win_prob, reasons = calculate_win_probability(ind)
     pos = calc_position(ind, capital)
     
-    # Sniper filters — very strict
     if win_prob < CFG["min_win_prob"]:
         return None
     if pos["tp_pct"] < CFG["min_profit_pct"]:
@@ -517,16 +672,15 @@ def analyze_ticker(ticker, capital):
         return None
     if not (ind["ema8"] > ind["ema21"] and ind["price"] > ind["ema50"]):
         return None
-    if ind["rsi"] > 72:  # Too overbought
+    if ind["rsi"] > 72:
         return None
     
-    # Bonus for strong multi-timeframe
     if weekly_score >= 60:
         win_prob = min(95, win_prob + 5)
-        reasons.append(("📅 Weekly Confirmed", f"Weekly trend score: {weekly_score}/100"))
+        reasons.append(("Weekly Confirmed", f"Weekly score {weekly_score}/100"))
     if days_valid >= 4:
         win_prob = min(95, win_prob + 3)
-        reasons.append(("🔒 Stable Setup", f"Valid for {days_valid} consecutive days."))
+        reasons.append(("Stable Setup", f"Valid {days_valid} consecutive days"))
     
     return {
         "ticker": ticker,
@@ -541,150 +695,251 @@ def analyze_ticker(ticker, capital):
     }
 
 
-# ──────────────────────────────────────────────────────────────────
-#  SCAN MARKET — Find THE ONE best stock
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  SCAN MARKET
+# ══════════════════════════════════════════════════════════════════
 def scan_market(tickers, capital, progress_callback=None):
-    """Scan all tickers and return THE SINGLE BEST pick."""
     results = []
     total = len(tickers)
     completed = 0
     
     with ThreadPoolExecutor(max_workers=CFG["scan_threads"]) as executor:
         futures = {executor.submit(analyze_ticker, ticker, capital): ticker for ticker in tickers}
-        
         for future in as_completed(futures):
             completed += 1
             if progress_callback:
                 progress_callback(completed / total)
-            
             result = future.result()
             if result is not None:
                 results.append(result)
     
-    # Sort by win probability
     results.sort(key=lambda x: x["win_prob"], reverse=True)
-    
-    # Return only THE BEST ONE
     return results[0] if results else None
 
 
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+#  BACKTEST — Historical Signals
+# ══════════════════════════════════════════════════════════════════
+@st.cache_data(ttl=3600, show_spinner=False)
+def run_backtest():
+    """Simulate past 3 months of signals and their outcomes."""
+    signals = []
+    
+    for ticker in ALL_TICKERS:
+        try:
+            t = yf.Ticker(ticker)
+            df = t.history(period="6mo", interval="1d", auto_adjust=True, timeout=10)
+            if df is None or df.empty or len(df) < 100:
+                continue
+            
+            df.columns = [col.lower() for col in df.columns]
+            c = df["close"]
+            
+            # Calculate indicators for the whole period
+            ema8 = c.ewm(span=8).mean()
+            ema21 = c.ewm(span=21).mean()
+            ema50 = c.ewm(span=50).mean()
+            
+            df.ta.rsi(length=14, append=True)
+            df.ta.adx(length=14, append=True)
+            df.ta.atr(length=14, append=True)
+            
+            rsi = df["RSI_14"] if "RSI_14" in df.columns else pd.Series([50]*len(df))
+            adx = df["ADX_14"] if "ADX_14" in df.columns else pd.Series([25]*len(df))
+            atr = df["ATRr_14"] if "ATRr_14" in df.columns else c * 0.02
+            
+            # Look for entry signals in past 3 months (skip last 20 days for outcome)
+            start_idx = max(60, len(df) - 90)
+            end_idx = len(df) - 20
+            
+            for i in range(start_idx, end_idx):
+                price = c.iloc[i]
+                e8 = ema8.iloc[i]
+                e21 = ema21.iloc[i]
+                e50 = ema50.iloc[i]
+                r = rsi.iloc[i] if i < len(rsi) else 50
+                a = adx.iloc[i] if i < len(adx) else 25
+                at = atr.iloc[i] if i < len(atr) else price * 0.02
+                
+                # Check for valid setup
+                if not (price > e8 > e21 > e50):
+                    continue
+                if not (45 <= r <= 65):
+                    continue
+                if a < 20:
+                    continue
+                
+                # Check persistence (2 days before)
+                if i < 2:
+                    continue
+                prev_valid = True
+                for j in range(1, 3):
+                    if not (c.iloc[i-j] > ema8.iloc[i-j] > ema21.iloc[i-j]):
+                        prev_valid = False
+                        break
+                if not prev_valid:
+                    continue
+                
+                # Calculate SL/TP
+                entry_price = float(price)
+                sl = entry_price - float(at) * 1.5
+                tp = entry_price + float(at) * 4.0
+                
+                # Check outcome in next 20 days
+                hit_tp = False
+                hit_sl = False
+                exit_price = entry_price
+                exit_days = 0
+                
+                for k in range(1, min(21, len(df) - i)):
+                    high_k = df["high"].iloc[i + k]
+                    low_k = df["low"].iloc[i + k]
+                    
+                    if low_k <= sl:
+                        hit_sl = True
+                        exit_price = sl
+                        exit_days = k
+                        break
+                    if high_k >= tp:
+                        hit_tp = True
+                        exit_price = tp
+                        exit_days = k
+                        break
+                
+                if not hit_tp and not hit_sl:
+                    exit_price = float(c.iloc[min(i + 15, len(df) - 1)])
+                    exit_days = 15
+                
+                pnl_pct = (exit_price - entry_price) / entry_price * 100
+                
+                signals.append({
+                    "ticker": ticker,
+                    "date": df.index[i].strftime("%b %d"),
+                    "entry": entry_price,
+                    "exit": exit_price,
+                    "days": exit_days,
+                    "pnl_pct": pnl_pct,
+                    "won": pnl_pct > 0,
+                    "hit_tp": hit_tp,
+                    "hit_sl": hit_sl,
+                })
+                
+                # Skip ahead to avoid duplicate signals
+                break
+                
+        except Exception:
+            continue
+    
+    return signals
+
+
+def calculate_backtest_stats(signals):
+    if not signals:
+        return {"total": 0, "wins": 0, "win_rate": 0, "avg_win": 0, "avg_loss": 0, "best": 0, "worst": 0}
+    
+    wins = [s for s in signals if s["won"]]
+    losses = [s for s in signals if not s["won"]]
+    
+    return {
+        "total": len(signals),
+        "wins": len(wins),
+        "win_rate": len(wins) / len(signals) * 100 if signals else 0,
+        "avg_win": sum(s["pnl_pct"] for s in wins) / len(wins) if wins else 0,
+        "avg_loss": sum(s["pnl_pct"] for s in losses) / len(losses) if losses else 0,
+        "best": max(s["pnl_pct"] for s in signals) if signals else 0,
+        "worst": min(s["pnl_pct"] for s in signals) if signals else 0,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
 #  CHART
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
 def make_chart(df, ind, pos):
-    """Create chart with EMAs and trade levels."""
     df2 = df.tail(60).copy()
     c = df2["close"]
     
     ema8 = c.ewm(span=8).mean()
     ema21 = c.ewm(span=21).mean()
-    ema50 = c.ewm(span=50).mean()
     
     fig = go.Figure()
     
-    # Candlestick
     fig.add_trace(go.Candlestick(
         x=df2.index, open=df2["open"], high=df2["high"],
         low=df2["low"], close=df2["close"],
         name="Price",
-        increasing_line_color="#00ff88",
-        decreasing_line_color="#f85149",
+        increasing_line_color="#30d158",
+        decreasing_line_color="#ff453a",
     ))
     
-    # EMAs
-    fig.add_trace(go.Scatter(x=df2.index, y=ema8, name="EMA 8", line=dict(color="#00bfff", width=1)))
-    fig.add_trace(go.Scatter(x=df2.index, y=ema21, name="EMA 21", line=dict(color="#ffa500", width=1)))
-    fig.add_trace(go.Scatter(x=df2.index, y=ema50, name="EMA 50", line=dict(color="#9370db", width=1)))
+    fig.add_trace(go.Scatter(x=df2.index, y=ema8, name="EMA 8", line=dict(color="#0a84ff", width=1)))
+    fig.add_trace(go.Scatter(x=df2.index, y=ema21, name="EMA 21", line=dict(color="#ff9f0a", width=1)))
     
-    # SL/TP lines
-    fig.add_hline(y=pos["sl"], line_dash="dash", line_color="#f85149", 
-                  annotation_text=f"Stop ${pos['sl']:.2f}", annotation_position="right")
-    fig.add_hline(y=pos["tp"], line_dash="dash", line_color="#00ff88",
-                  annotation_text=f"Target ${pos['tp']:.2f}", annotation_position="right")
+    fig.add_hline(y=pos["sl"], line_dash="dash", line_color="#ff453a", annotation_text="Stop")
+    fig.add_hline(y=pos["tp"], line_dash="dash", line_color="#30d158", annotation_text="Target")
     
     fig.update_layout(
-        paper_bgcolor="#0d1117", plot_bgcolor="#0d1117",
-        font=dict(color="#8b949e", size=10),
-        xaxis=dict(gridcolor="#21262d", showgrid=True),
-        yaxis=dict(gridcolor="#21262d", showgrid=True, side="right"),
+        paper_bgcolor="#1c1c1e",
+        plot_bgcolor="#1c1c1e",
+        font=dict(color="#86868b", size=10),
+        xaxis=dict(gridcolor="#2c2c2e", showgrid=True),
+        yaxis=dict(gridcolor="#2c2c2e", showgrid=True, side="right"),
         xaxis_rangeslider_visible=False,
         legend=dict(orientation="h", y=1.1),
-        height=400,
-        margin=dict(l=10, r=60, t=40, b=10),
+        height=350,
+        margin=dict(l=10, r=50, t=30, b=10),
     )
     return fig
 
 
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
 #  MAIN UI
-# ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
 
 # Session state
 if "sniper_result" not in st.session_state:
     st.session_state["sniper_result"] = None
 if "capital" not in st.session_state:
     st.session_state["capital"] = 1000.0
+if "show_backtest" not in st.session_state:
+    st.session_state["show_backtest"] = False
 
 # Inject CSS
 st.markdown(CSS, unsafe_allow_html=True)
 
 # Header
-st.markdown('<div class="header">🎯 SNIPER MODE</div>', unsafe_allow_html=True)
-st.markdown('<div class="subheader">One Perfect Pick · Quality Over Quantity · Built for $1,000</div>', unsafe_allow_html=True)
-
-# Market Regime
-regime, regime_score, regime_msg = get_market_regime()
-
-regime_color = "#00ff88" if regime == "BULLISH" else "#ffd700" if regime == "NEUTRAL" else "#f85149"
-st.markdown(f"""
-<div class="market-box" style="border-left: 4px solid {regime_color};">
-    <span style="font-size: 1.1em; font-weight: bold; color: {regime_color};">{regime_msg}</span>
-    <span style="color: #666; margin-left: 12px;">(SPY Score: {regime_score}/100)</span>
+st.markdown("""
+<div class="app-header">
+    <h1 class="app-title">Sniper Mode</h1>
+    <p class="app-subtitle">One Perfect Pick · Quality Over Quantity</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Warning if bearish
-if regime == "BEARISH":
-    st.markdown("""
-    <div class="warning-box">
-        ⚠️ <b>WAIT!</b> Market conditions are not favorable. 
-        Consider staying in cash until SPY turns bullish.
-    </div>
-    """, unsafe_allow_html=True)
+# Market Status
+regime, regime_score, regime_msg = get_market_regime()
+pill_class = f"market-{regime.lower()}"
+st.markdown(f"""
+<div style="text-align: center;">
+    <span class="market-pill {pill_class}">
+        <span>●</span> Market: {regime_msg}
+    </span>
+</div>
+""", unsafe_allow_html=True)
 
-st.markdown("---")
+st.markdown("<hr>", unsafe_allow_html=True)
 
-# Capital input
-col1, col2 = st.columns([2, 3])
-with col1:
-    capital = st.number_input(
-        "💰 Your Capital (USD)",
-        min_value=100.0,
-        max_value=100000.0,
-        value=st.session_state["capital"],
-        step=100.0,
-        key="capital_input"
-    )
-    st.session_state["capital"] = capital
-
-with col2:
-    scan_btn = st.button("🎯 FIND THE BEST TRADE", type="primary", use_container_width=True)
-
-st.markdown("---")
+# Scan Button
+scan_btn = st.button("Find Best Trade", type="primary", use_container_width=True)
 
 # Handle scan
 if scan_btn:
     st.session_state["sniper_result"] = None
-    
-    progress = st.progress(0, text=f"Scanning {len(ALL_TICKERS)} quality stocks...")
+    progress = st.progress(0, text="Scanning...")
     
     def update_progress(pct):
-        progress.progress(pct, text=f"Analyzing... {int(pct*100)}%")
+        progress.progress(pct, text=f"Analyzing {int(pct*100)}%")
     
-    result = scan_market(ALL_TICKERS, capital, update_progress)
+    result = scan_market(ALL_TICKERS, 1000, update_progress)
     progress.empty()
-    
     st.session_state["sniper_result"] = result
 
 # Display result
@@ -695,134 +950,145 @@ if result is not None:
     pos = result["pos"]
     reasons = result["reasons"]
     
-    # THE SNIPER CARD
     st.markdown(f"""
-    <div class="sniper-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-            <div>
-                <span class="ticker-big">{result['ticker']}</span>
-                <span class="price-big">${ind['price']:.2f}</span>
-                <span style="background: #ffd700; color: #000; padding: 4px 10px; border-radius: 6px; font-weight: bold; margin-left: 12px; font-size: 0.8rem;">{result['sector']}</span>
-            </div>
+    <div class="result-card">
+        <div class="ticker-display">
+            <span class="ticker-symbol">{result['ticker']}</span>
+            <span class="ticker-price">${ind['price']:.2f}</span>
         </div>
+        <span class="ticker-sector">{result['sector']}</span>
         
-        <div class="prob-container">
+        <div class="prob-circle">
             <div class="prob-number">{result['win_prob']}%</div>
             <div class="prob-label">Win Probability</div>
         </div>
         
-        <div class="levels-box">
+        <div class="levels-grid">
             <div class="level-item">
-                <div class="level-value entry-color">${ind['price']:.2f}</div>
-                <div class="level-label">Entry Price</div>
+                <div class="level-value white">${ind['price']:.2f}</div>
+                <div class="level-label">Entry</div>
             </div>
             <div class="level-item">
-                <div class="level-value sl-color">${pos['sl']:.2f}</div>
-                <div class="level-label">Stop Loss (-{pos['sl_pct']:.1f}%)</div>
+                <div class="level-value red">${pos['sl']:.2f}</div>
+                <div class="level-label">Stop Loss</div>
             </div>
             <div class="level-item">
-                <div class="level-value tp-color">${pos['tp']:.2f}</div>
-                <div class="level-label">Target (+{pos['tp_pct']:.1f}%)</div>
+                <div class="level-value green">${pos['tp']:.2f}</div>
+                <div class="level-label">Target</div>
             </div>
             <div class="level-item">
-                <div class="level-value" style="color: #ffd700;">1:{pos['rr']:.1f}</div>
-                <div class="level-label">Reward:Risk</div>
+                <div class="level-value blue">1:{pos['rr']:.1f}</div>
+                <div class="level-label">Risk/Reward</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # ACTION BOX
+    # Capital Input (only shown after stock found)
+    st.markdown('<div class="capital-card"><div class="capital-title">💰 Calculate Position Size</div></div>', unsafe_allow_html=True)
+    capital = st.number_input("Enter your capital ($)", min_value=100.0, max_value=1000000.0, value=st.session_state["capital"], step=100.0, label_visibility="collapsed")
+    st.session_state["capital"] = capital
+    
+    # Recalculate position with user's capital
+    pos = calc_position(ind, capital)
+    
     st.markdown(f"""
-    <div class="action-box">
-        <div style="font-size: 1.2rem; font-weight: bold; color: #00ff88; margin-bottom: 0.8rem;">📋 YOUR TRADE PLAN</div>
-        <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1rem; color: #ccc;">
-            <div><b>Buy:</b> {pos['shares']:.2f} shares</div>
-            <div><b>Capital Used:</b> ${pos['cap_used']:.0f} ({pos['cap_pct']:.0f}%)</div>
-            <div><b>Max Loss:</b> <span style="color:#f85149;">${pos['max_loss']:.0f}</span></div>
-            <div><b>Max Gain:</b> <span style="color:#00ff88;">${pos['max_gain']:.0f}</span></div>
-        </div>
-        <div style="margin-top: 1rem; color: #888; font-size: 0.9rem;">
-            🔒 Setup valid for {result['days_valid']} days · 📅 Weekly score: {result['weekly_score']}/100
+    <div class="trade-plan">
+        <div class="plan-title">📋 Your Trade Plan</div>
+        <div class="plan-grid">
+            <div class="plan-item"><span>Shares:</span> {pos['shares']:.2f}</div>
+            <div class="plan-item"><span>Capital:</span> ${pos['cap_used']:.0f}</div>
+            <div class="plan-item"><span>Max Loss:</span> <span style="color:#ff453a">${pos['max_loss']:.0f}</span></div>
+            <div class="plan-item"><span>Max Gain:</span> <span style="color:#30d158">${pos['max_gain']:.0f}</span></div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # WHY THIS STOCK
-    with st.expander("💡 WHY THIS STOCK? — See Analysis"):
+    # Why this stock
+    with st.expander("Why this stock?"):
         for title, text in reasons:
-            st.markdown(f"""
-            <div class="reason-box">
-                <div class="reason-title">{title}</div>
-                <div class="reason-text">{text}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Key metrics
-        st.markdown("---")
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("RSI", f"{ind['rsi']:.0f}")
-        col2.metric("ADX", f"{ind['adx']:.0f}")
-        col3.metric("Volume", f"{ind['vol_ratio']:.1f}x")
-        col4.metric("5-Day", f"{ind['chg_5d']:+.1f}%")
+            st.markdown(f'<div class="reason-item"><div class="reason-title">{title}</div><div class="reason-text">{text}</div></div>', unsafe_allow_html=True)
     
     # Chart
-    with st.expander("📊 VIEW CHART"):
+    with st.expander("View Chart"):
         fig = make_chart(result["df"], ind, pos)
         st.plotly_chart(fig, use_container_width=True)
-    
-    # TRADING RULES REMINDER
-    st.markdown("""
-    <div style="background: #1a2332; border-radius: 10px; padding: 1rem; margin-top: 1rem;">
-        <div style="color: #ffd700; font-weight: bold; margin-bottom: 0.5rem;">📜 TRADING RULES</div>
-        <div style="color: #888; font-size: 0.9rem; line-height: 1.6;">
-            1. Only enter if market is BULLISH or NEUTRAL<br>
-            2. Set your stop loss IMMEDIATELY after buying<br>
-            3. Hold for 1-3 weeks (don't panic sell)<br>
-            4. Take profit at target OR if RSI > 75<br>
-            5. If stopped out, wait 1-2 days before next trade<br>
-            6. Scan once per day (after market close)
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
 elif scan_btn:
-    # No results found
     st.markdown("""
-    <div class="no-signal">
-        <div style="font-size: 4rem; margin-bottom: 1rem;">🔍</div>
-        <div style="font-size: 1.3rem; color: #ffd700; margin-bottom: 0.5rem;">No Perfect Setup Found</div>
-        <div style="font-size: 0.95rem; color: #888;">
-            The market doesn't have any stocks meeting our strict 70%+ criteria right now.<br>
-            This is actually <b>good</b> — it means we're protecting your capital.<br><br>
-            <b>What to do:</b> Wait. Check back tomorrow. Patience is profitable.
+    <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <div class="empty-title">No Perfect Setup Today</div>
+        <div class="empty-text">
+            No stocks meet our strict 70%+ criteria right now.<br>
+            This protects your capital. Check back tomorrow.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 else:
-    # Initial state
     st.markdown(f"""
-    <div style="text-align: center; padding: 3rem; color: #888;">
-        <div style="font-size: 5rem; margin-bottom: 1rem;">🎯</div>
-        <div style="font-size: 1.5rem; color: #ffd700; margin-bottom: 0.5rem;">Ready to Find Your Trade</div>
-        <div style="font-size: 1rem; margin-bottom: 2rem;">
-            Scanning {len(ALL_TICKERS)} quality stocks to find THE ONE best opportunity.
-        </div>
-        <div style="font-size: 0.9rem; color: #666; line-height: 1.8;">
-            ✓ 70%+ Win Probability Required<br>
-            ✓ 10%+ Profit Target<br>
-            ✓ Weekly + Daily Trend Confirmation<br>
-            ✓ Setup must be stable for 2+ days<br>
-            ✓ Designed for $500-$1,000 capital
+    <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <div class="empty-title">Ready to Scan</div>
+        <div class="empty-text">
+            Scanning {len(ALL_TICKERS)} quality stocks for the single best opportunity.<br>
+            70%+ probability · 10%+ target · Multi-timeframe confirmed
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; color: #555; font-size: 0.8rem;">
-    ⚡ Sniper Mode v1.0 · Built for focused, quality trading · Scan once per day, not hourly
-</div>
-""", unsafe_allow_html=True)
+# Backtest Section
+st.markdown("<hr>", unsafe_allow_html=True)
+
+with st.expander("📊 Past Performance (3 Months)"):
+    backtest_btn = st.button("Run Backtest", key="backtest_btn")
+    
+    if backtest_btn:
+        with st.spinner("Analyzing historical signals..."):
+            signals = run_backtest()
+            st.session_state["backtest_signals"] = signals
+    
+    if "backtest_signals" in st.session_state:
+        signals = st.session_state["backtest_signals"]
+        stats = calculate_backtest_stats(signals)
+        
+        if stats["total"] > 0:
+            st.markdown(f"""
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">{stats['total']}</div>
+                    <div class="stat-label">Signals</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" style="color: #30d158;">{stats['win_rate']:.0f}%</div>
+                    <div class="stat-label">Win Rate</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" style="color: #30d158;">+{stats['avg_win']:.1f}%</div>
+                    <div class="stat-label">Avg Win</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" style="color: #ff453a;">{stats['avg_loss']:.1f}%</div>
+                    <div class="stat-label">Avg Loss</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown('<div class="backtest-title">Recent Signals</div>', unsafe_allow_html=True)
+            
+            for s in sorted(signals, key=lambda x: x["pnl_pct"], reverse=True)[:10]:
+                color = "#30d158" if s["won"] else "#ff453a"
+                result_text = f"+{s['pnl_pct']:.1f}%" if s["won"] else f"{s['pnl_pct']:.1f}%"
+                outcome = "TP Hit" if s["hit_tp"] else "SL Hit" if s["hit_sl"] else f"{s['days']}d"
+                
+                st.markdown(f"""
+                <div class="signal-row">
+                    <span class="signal-ticker">{s['ticker']}</span>
+                    <span class="signal-date">{s['date']} · ${s['entry']:.0f} → ${s['exit']:.0f}</span>
+                    <span style="color: #86868b;">{outcome}</span>
+                    <span class="signal-result" style="color: {color};">{result_text}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No signals found in the past 3 months with current criteria.")
