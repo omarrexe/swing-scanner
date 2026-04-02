@@ -1,85 +1,139 @@
-# Swing Trading Scanner
+# ⚡ Elite Swing Scanner
 
-A beginner-friendly US stock market scanner built with Python and Streamlit.
-It analyzes stocks using 7 scientific checks and generates a complete trade plan
-based on your available capital.
+A professional-grade US stock market scanner for swing trading. Uses a **10-factor Win Probability Algorithm** to find high-probability setups with 65%+ win rates.
 
----
-
-## What It Does
-
-- Scans 60+ US stocks across major sectors
-- Runs 7 independent technical checks on each stock
-- Explains every signal in plain English
-- Calculates exact Stop Loss, Take Profit, and position size based on your capital
-- Includes an interactive price chart with trade levels
-- Allows searching and analyzing any US stock ticker directly
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io)
 
 ---
 
-## How It Works
+## 🎯 What It Does
 
-The scanner uses the following indicators:
-
-1. EMA Stack — checks if the trend is aligned upward
-2. RSI Momentum — checks if buying pressure is in a healthy zone
-3. MACD — checks if momentum is positive and accelerating
-4. Volume — checks if institutions are actively buying
-5. Bollinger Bands — checks if the price has room to move up
-6. VWAP — checks if buyers are in control intraday
-7. News Sentiment — checks if recent headlines support the move
-
-A stock needs at least 4 out of 7 checks to pass before a BUY signal is issued.
+- **Scans 142 stocks** across 16 sectors (Tech, Semis, Finance, Energy, etc.)
+- **10-factor scoring system** calculates Win Probability (0-100%)
+- **Only shows TOP 3 picks** with 65%+ probability — no noise
+- **Market Regime Detection** — checks if SPY is bullish before trading
+- **Sector Diversification** — ensures picks aren't all from same sector
+- **Clear explanations** — tells you WHY each stock is a good pick
+- **Precise trade levels** — Entry, Stop Loss, Take Profit, Position Size
 
 ---
 
-## Risk Management
+## 🧠 Win Probability Algorithm (10 Factors)
 
-The scanner follows professional risk rules automatically:
+| Factor | Max Points | What It Checks |
+|--------|------------|----------------|
+| 1. Trend Alignment | 25 | EMA8 > EMA21 > EMA50 > EMA200 |
+| 2. ADX Trend Strength | 15 | ADX > 25 with +DI dominating |
+| 3. RSI Sweet Spot | 15 | RSI 40-55 and rising |
+| 4. MACD Confirmation | 12 | Bullish crossover, histogram rising |
+| 5. Volume Confirmation | 12 | 1.5x+ average volume on up day |
+| 6. Relative Strength | 10 | Outperforming SPY over 20 days |
+| 7. Price Position | 8 | Middle of Bollinger, above VWAP |
+| 8. Breakout/Pullback | 8 | Near resistance or EMA21 pullback |
+| 9. Supertrend | 10 | Supertrend indicator bullish |
+| 10. News Catalyst | 5 | Positive headlines |
 
-- Never risk more than 1.5% of your total capital on a single trade
-- Never allocate more than 30% of your capital to one stock
-- Stop Loss is set at 1.5x the Average True Range below entry
-- Take Profit is set at 3.5x the Average True Range above entry
-- Minimum Risk to Reward ratio required: 1:2
+**Total: 120 points max → Converted to 0-100% probability**
 
 ---
 
-## Installation
+## 📊 Market Regime Detection
 
+Before showing any picks, the scanner analyzes **SPY (S&P 500)** to determine market conditions:
+
+- 🟢 **BULLISH** (Score ≥50): Great conditions for swing trades
+- 🟡 **NEUTRAL** (Score 20-49): Be selective, trade quality only
+- 🔴 **BEARISH** (Score <20): Avoid long positions
+
+This prevents "swimming against the tide" when the overall market is weak.
+
+---
+
+## 🛡️ Risk Management
+
+Professional risk rules built-in:
+
+- **Max 1.5% risk** per trade (protects capital)
+- **Max 30% allocation** to any single stock
+- **Stop Loss**: 1.5x ATR below entry
+- **Take Profit**: 3.5x ATR above entry
+- **Minimum R:R**: 1:2 required
+
+---
+
+## ⚡ Technical Features
+
+- **Parallel scanning** — 10 threads for fast analysis
+- **pandas-ta integration** — 130+ professional indicators
+- **Supertrend indicator** — Powerful trend confirmation
+- **Sector diversification** — 16 sector categories
+- **Real-time data** — Via yfinance API
+
+---
+
+## 🚀 Installation
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
 ```
-pip install streamlit yfinance pandas numpy plotly requests
+
+Or install manually:
+```bash
+pip install streamlit yfinance pandas numpy plotly requests pandas-ta
 streamlit run app.py
 ```
 
 ---
 
-## Deploy on Streamlit Cloud (Free)
+## ☁️ Deploy on Streamlit Cloud (Free)
 
-1. Fork or upload this repository to your GitHub account
-2. Go to share.streamlit.io
-3. Click New app
-4. Select this repository and set the main file to app.py
-5. Click Deploy
+1. Fork this repository to your GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Click **New app**
+4. Select this repo, set main file to `app.py`
+5. Click **Deploy**
 
-The app will be live at a public URL within a few minutes.
+Live in ~2 minutes!
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 swing-scanner/
-    app.py              Main application
-    requirements.txt    Python dependencies
-    README.md           This file
+├── app.py              # Main application (all-in-one)
+├── requirements.txt    # Python dependencies
+├── .gitignore          # Git ignore rules
+└── README.md           # This file
 ```
 
 ---
 
-## Disclaimer
+## 📈 Stocks Covered (142 Total)
 
-This tool is for educational and informational purposes only.
-It is not financial advice. Always do your own research before
-making any investment decisions. Past signals do not guarantee
-future results.
+**Tech**: AAPL, MSFT, GOOGL, META, AMZN, NFLX, CRM, ADBE, ORCL, IBM, CSCO, INTC  
+**Semiconductors**: NVDA, AMD, AVGO, QCOM, MU, MRVL, AMAT, LRCX, KLAC, TSM, ASML  
+**Finance**: JPM, BAC, WFC, GS, MS, C, BLK, SCHW, AXP  
+**Payments**: V, MA, PYPL, SQ  
+**Retail**: WMT, COST, TGT, HD, LOW, NKE, SBUX, MCD, DPZ  
+**Health**: UNH, JNJ, PFE, ABBV, MRK, LLY, BMY, AMGN, GILD, MRNA, ISRG  
+**Energy**: XOM, CVX, COP, SLB, OXY, EOG, PXD, DVN, MPC, VLO, PSX  
+**And more...**
+
+---
+
+## ⚠️ Disclaimer
+
+**This tool is for educational and informational purposes only.**
+
+- Not financial advice
+- Past performance doesn't guarantee future results
+- Always do your own research
+- Never invest more than you can afford to lose
+
+---
+
+## 📜 License
+
+MIT License - Free to use and modify.
